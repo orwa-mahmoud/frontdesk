@@ -15,7 +15,8 @@ class Base(DeclarativeBase):
 
 # ── Model imports (must come after Base to avoid circulars) ───────
 from src.infrastructure.persistence.postgres.models.tenant import TenantModel  # noqa: E402
+from src.infrastructure.persistence.postgres.models.token_usage import TokenUsageModel  # noqa: E402
 from src.infrastructure.persistence.postgres.models.user import UserModel  # noqa: E402
 from src.infrastructure.persistence.postgres.models.user_tenant import UserTenantModel  # noqa: E402
 
-__all__ = ["Base", "TenantModel", "UserModel", "UserTenantModel"]
+__all__ = ["Base", "TenantModel", "TokenUsageModel", "UserModel", "UserTenantModel"]
