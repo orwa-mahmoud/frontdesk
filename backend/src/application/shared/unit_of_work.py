@@ -10,6 +10,9 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.persistence.postgres.repositories.tenant_repo import PostgresTenantRepository
+from src.infrastructure.persistence.postgres.repositories.token_usage_repo import (
+    PostgresTokenUsageRepository,
+)
 from src.infrastructure.persistence.postgres.repositories.user_repo import PostgresUserRepository
 from src.infrastructure.persistence.postgres.repositories.user_tenant_repo import (
     PostgresUserTenantRepository,
@@ -22,6 +25,7 @@ class UnitOfWork:
         self.tenants = PostgresTenantRepository(session)
         self.users = PostgresUserRepository(session)
         self.user_tenants = PostgresUserTenantRepository(session)
+        self.token_usages = PostgresTokenUsageRepository(session)
 
     async def flush(self) -> None:
         """Push pending inserts/updates to the DB without committing — useful
