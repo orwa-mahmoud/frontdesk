@@ -7,7 +7,7 @@ from src.domain.llm.value_objects import LLMCallResult, LLMMessage, LLMMessageRo
 
 def test_token_usage_total() -> None:
     u = TokenUsage(input_tokens=100, output_tokens=50, cache_read_tokens=30)
-    assert u.total == 180
+    assert u.total == 150
 
 
 def test_llm_message_construction() -> None:

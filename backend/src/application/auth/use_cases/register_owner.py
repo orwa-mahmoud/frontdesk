@@ -67,9 +67,7 @@ class RegisterOwnerUseCase:
         )
         await self._uow.user_tenants.save(link)
 
-        # Create default tenant config (owner updates LLM keys via settings later).
         config = TenantConfig.create_default(tenant_id=tenant.id)
-        config._is_new = True
         await self._uow.tenant_configs.save(config)
 
         token = self._jwt_service.issue_access_token(user_id=user.id, tenant_id=tenant.id)

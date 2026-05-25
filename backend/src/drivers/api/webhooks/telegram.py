@@ -41,30 +41,34 @@ async def telegram_webhook(
     return Response(status_code=status)
 
 
-async def _handle_telegram_post(tid: UUID, body: dict[str, Any], secret_header: str | None, tenant_id_raw: str) -> int:
+def _parse_telegram_message(body: dict[str, Any]) -> tuple[str, str, str | None, str] | None:
+    """Extract (text, telegram_user_id, sender_name, chat_id) or None if no actionable message."""
     message = body.get("message") or body.get("edited_message")
     if not message:
-        return 200
-
+        return None
     from_user = message.get("from", {})
     telegram_user_id = str(from_user.get("id", ""))
     text = message.get("text", "")
-    sender_name = from_user.get("first_name")
-    chat_id = str(message.get("chat", {}).get("id", ""))
-
     if not text or not telegram_user_id:
+        return None
+    return text, telegram_user_id, from_user.get("first_name"), str(message.get("chat", {}).get("id", ""))
+
+
+async def _handle_telegram_post(tid: UUID, body: dict[str, Any], secret_header: str | None, tenant_id_raw: str) -> int:
+    parsed = _parse_telegram_message(body)
+    if not parsed:
         return 200
+    text, telegram_user_id, sender_name, chat_id = parsed
 
     async for session in get_session():
         uow = UnitOfWork(session)
         try:
             config = await uow.tenant_configs.get_by_tenant_id(tid)
             if config is None:
-                logger.warning("telegram.webhook.no_config", tenant_id=tenant_id_raw)
                 return 404
 
-            if config.telegram_webhook_secret and secret_header != config.telegram_webhook_secret:
-                logger.warning("telegram.webhook.invalid_secret", tenant_id=tenant_id_raw)
+            if not config.telegram_webhook_secret or secret_header != config.telegram_webhook_secret:
+                logger.warning("telegram.webhook.auth_failed", tenant_id=tenant_id_raw)
                 return 403
 
             result = await chat_with_agent(

@@ -31,7 +31,7 @@ def _parse_pdf(content: bytes) -> str:
         pages = [page.extract_text() or "" for page in reader.pages]
         return "\n\n".join(p.strip() for p in pages if p.strip())
     except Exception as exc:
-        raise InvalidOperationError(f"Could not parse PDF: {exc}") from exc
+        raise InvalidOperationError("Could not parse PDF. The file may be corrupted or password-protected.") from exc
 
 
 def _parse_docx(content: bytes) -> str:
@@ -42,4 +42,4 @@ def _parse_docx(content: bytes) -> str:
         paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
         return "\n\n".join(paragraphs)
     except Exception as exc:
-        raise InvalidOperationError(f"Could not parse DOCX: {exc}") from exc
+        raise InvalidOperationError("Could not parse DOCX. The file may be corrupted.") from exc
