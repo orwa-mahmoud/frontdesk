@@ -27,3 +27,10 @@ class MessageResponse(BaseModel):
     tool_result: dict[str, Any] | None
     is_checkpoint: bool
     created_at: datetime
+
+
+class DailySummaryResponse(BaseModel):
+    date: str
+    total_messages: int
+    active_conversations: int
+    questions_escalated: int
