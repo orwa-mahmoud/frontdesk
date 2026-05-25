@@ -27,6 +27,10 @@ class EmbeddingPort(Protocol):
     def dimensions(self) -> int: ...
 
 
+class RerankerPort(Protocol):
+    async def rerank(self, query: str, chunks: list[RetrievedChunk], *, top_k: int = 8) -> list[RetrievedChunk]: ...
+
+
 class RetrieverPort(Protocol):
     async def hybrid_retrieve(
         self,
