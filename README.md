@@ -5,11 +5,7 @@ questions get RAG-grounded answers from the tenant's documents; anything
 the AI doesn't know is escalated to the owner as a pending question,
 and the asker is notified once the owner replies.
 
-> **Status:** v0.1.0 — 109 commits, 711 tests (531 backend + 180
-> frontend), 99.4% coverage on both SonarQube dashboards (0/0/0).
-> LangGraph agent loop, per-tenant LLM config, WhatsApp + Telegram
-> webhooks, hybrid RAG, escalation inbox, settings dashboard,
-> circuit breaker, event bus, key facts memory, Prometheus metrics.
+> **Status:** v0.1.0 — 711 tests, 99.4% coverage, SonarQube 0/0/0.
 
 ## What it does
 
