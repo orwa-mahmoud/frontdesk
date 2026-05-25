@@ -12,7 +12,7 @@ class ListDocumentsUseCase:
         self._uow = uow
 
     async def execute(self, query: ListDocuments) -> list[DocumentDTO]:
-        docs = await self._uow.documents.list_for_tenant(query.tenant_id)
+        docs = await self._uow.documents.list_for_tenant(query.tenant_id, limit=query.limit, offset=query.offset)
         return [
             DocumentDTO(
                 id=d.id,
