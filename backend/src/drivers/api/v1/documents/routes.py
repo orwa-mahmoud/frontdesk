@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 
 from src.application.documents.commands import IngestDocument
 from src.application.documents.queries import ListDocuments, RetrieveForQuery
@@ -100,9 +100,14 @@ async def upload_document(
 
 
 @router.get("")
-async def list_documents(current_user: CurrentUser, uow: UnitOfWorkDep) -> list[DocumentSummary]:
+async def list_documents(
+    current_user: CurrentUser,
+    uow: UnitOfWorkDep,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[DocumentSummary]:
     tenant_id = await _resolve_tenant_id(current_user, uow)
-    dtos = await ListDocumentsUseCase(uow=uow).execute(ListDocuments(tenant_id=tenant_id))
+    dtos = await ListDocumentsUseCase(uow=uow).execute(ListDocuments(tenant_id=tenant_id, limit=limit, offset=offset))
     return [
         DocumentSummary(
             id=d.id,

@@ -9,6 +9,8 @@ from uuid import UUID
 @dataclass(frozen=True, kw_only=True)
 class ListDocuments:
     tenant_id: UUID
+    limit: int = 100
+    offset: int = 0
 
 
 @dataclass(frozen=True, kw_only=True)

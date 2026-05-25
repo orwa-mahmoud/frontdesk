@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
 from src.domain.shared.exceptions import AuthenticationError, AuthorizationError, EntityNotFoundError
@@ -29,13 +30,16 @@ async def _resolve_tenant_id(current_user: CurrentUser, uow: UnitOfWorkDep) -> U
 async def list_conversations(
     current_user: CurrentUser,
     uow: UnitOfWorkDep,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ConversationSummary]:
     tenant_id = await _resolve_tenant_id(current_user, uow)
     stmt = (
         select(ConversationModel)
         .where(ConversationModel.tenant_id == tenant_id)
         .order_by(ConversationModel.last_message_at.desc().nullslast())
-        .limit(100)
+        .limit(limit)
+        .offset(offset)
     )
     result = await uow._session.execute(stmt)
     return [
