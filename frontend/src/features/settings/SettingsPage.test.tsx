@@ -219,4 +219,67 @@ describe("SettingsPage", () => {
     fireEvent.click(screen.getByText("Save bot config"));
     await waitFor(() => expect(updateBot).toHaveBeenCalled());
   });
+
+  it("submits LLM form with filled model field", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateLLM).mockResolvedValue(CONFIG);
+    const { container } = render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Save LLM config")).toBeInTheDocument());
+
+    const llmPanel = container.querySelector("[data-active='true'] .mantine-Accordion-panel");
+    const modelInput = llmPanel?.querySelector("input[data-path='model']") ?? screen.getAllByLabelText("Model")[0];
+    fireEvent.change(modelInput, { target: { value: "gpt-4o" } });
+    fireEvent.click(screen.getByText("Save LLM config"));
+
+    await waitFor(() => {
+      expect(updateLLM).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-4o" }), expect.anything());
+    });
+  });
+
+  it("submits WhatsApp form with filled phone field", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateWhatsApp).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("WhatsApp Cloud API")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("WhatsApp Cloud API"));
+    await waitFor(() => expect(screen.getByText("Save WhatsApp config")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Phone Number ID"), { target: { value: "9999" } });
+    fireEvent.click(screen.getByText("Save WhatsApp config"));
+
+    await waitFor(() => {
+      expect(updateWhatsApp).toHaveBeenCalledWith(expect.objectContaining({ phone_number_id: "9999" }), expect.anything());
+    });
+  });
+
+  it("submits Bot form with filled name field", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateBot).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Bot Personality")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Bot Personality"));
+    await waitFor(() => expect(screen.getByText("Save bot config")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Bot Name"), { target: { value: "NewBot" } });
+    fireEvent.click(screen.getByText("Save bot config"));
+
+    await waitFor(() => {
+      expect(updateBot).toHaveBeenCalledWith(expect.objectContaining({ name: "NewBot" }), expect.anything());
+    });
+  });
+
+  it("renders with null whatsapp/telegram config", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      ...CONFIG,
+      whatsapp_phone_number_id: null,
+      whatsapp_access_token_masked: null,
+      whatsapp_verify_token_masked: null,
+      telegram_bot_token_masked: null,
+      telegram_webhook_secret_masked: null,
+    });
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Settings")).toBeInTheDocument());
+  });
 });

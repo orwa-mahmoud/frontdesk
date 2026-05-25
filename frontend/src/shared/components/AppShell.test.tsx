@@ -74,4 +74,9 @@ describe("ProtectedShell", () => {
     render(wrap(<ProtectedShell><div>Page</div></ProtectedShell>));
     expect(screen.getByText("A")).toBeInTheDocument();
   });
+
+  it("shows owner role in sidebar", () => {
+    render(wrap(<ProtectedShell><div>Page</div></ProtectedShell>));
+    expect(screen.getByText("owner")).toBeInTheDocument();
+  });
 });
