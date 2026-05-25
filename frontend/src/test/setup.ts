@@ -1,5 +1,13 @@
 import "@testing-library/jest-dom/vitest";
 
+Object.defineProperty(document, "fonts", {
+  value: {
+    addEventListener: () => { /* noop */ },
+    removeEventListener: () => { /* noop */ },
+    ready: Promise.resolve([]),
+  },
+});
+
 Object.defineProperty(globalThis, "matchMedia", {
   writable: true,
   value: (query: string) => ({
