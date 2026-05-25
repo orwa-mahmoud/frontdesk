@@ -1,23 +1,19 @@
-"""Auth routes: register, login, /me."""
+"""Auth routes: register, login, /me, refresh."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, status
 
 from src.application.auth.commands import AuthenticateUser, RegisterOwner
+from src.application.auth.use_cases.refresh_token import RefreshTokenUseCase
 from src.bootstrap.container import (
     authenticate_user_use_case,
+    get_jwt_service,
     get_user_by_id_use_case,
     register_owner_use_case,
 )
 from src.drivers.api.dependencies import CurrentUser, UnitOfWorkDep
-from src.drivers.api.v1.auth.schemas import (
-    LoginRequest,
-    MeResponse,
-    RegisterRequest,
-    TenantSummary,
-    TokenResponse,
-)
+from src.drivers.api.v1.auth.schemas import LoginRequest, MeResponse, RegisterRequest, TenantSummary, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -32,22 +28,14 @@ async def register(req: RegisterRequest, uow: UnitOfWorkDep) -> TokenResponse:
         tenant_slug=req.tenant_slug,
     )
     result = await register_owner_use_case(uow).execute(cmd)
-    return TokenResponse(
-        access_token=result.access_token,
-        user_id=result.user_id,
-        tenant_id=result.tenant_id,
-    )
+    return TokenResponse(access_token=result.access_token, user_id=result.user_id, tenant_id=result.tenant_id)
 
 
 @router.post("/login")
 async def login(req: LoginRequest, uow: UnitOfWorkDep) -> TokenResponse:
     cmd = AuthenticateUser(email=req.email, password=req.password)
     result = await authenticate_user_use_case(uow).execute(cmd)
-    return TokenResponse(
-        access_token=result.access_token,
-        user_id=result.user_id,
-        tenant_id=result.tenant_id,
-    )
+    return TokenResponse(access_token=result.access_token, user_id=result.user_id, tenant_id=result.tenant_id)
 
 
 @router.get("/me")
@@ -58,10 +46,12 @@ async def me(current_user: CurrentUser, uow: UnitOfWorkDep) -> MeResponse:
         email=dto.email,
         full_name=dto.full_name,
         is_active=dto.is_active,
-        tenant=TenantSummary(
-            id=dto.tenant_id,
-            slug=dto.tenant_slug,
-            name=dto.tenant_name,
-            role=dto.role,
-        ),
+        tenant=TenantSummary(id=dto.tenant_id, slug=dto.tenant_slug, name=dto.tenant_name, role=dto.role),
     )
+
+
+@router.post("/refresh")
+async def refresh(current_user: CurrentUser, uow: UnitOfWorkDep) -> TokenResponse:
+    uc = RefreshTokenUseCase(uow=uow, jwt_service=get_jwt_service())
+    result = await uc.execute(current_user.id)
+    return TokenResponse(access_token=result.access_token, user_id=result.user_id, tenant_id=result.tenant_id)
