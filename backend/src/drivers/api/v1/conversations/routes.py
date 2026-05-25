@@ -1,16 +1,19 @@
-"""Conversations routes — list threads + get messages."""
+"""Conversations routes — list threads + get messages + daily summary."""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from src.domain.shared.exceptions import AuthenticationError, AuthorizationError, EntityNotFoundError
 from src.drivers.api.dependencies import CurrentUser, UnitOfWorkDep
-from src.drivers.api.v1.conversations.schemas import ConversationSummary, MessageResponse
+from src.drivers.api.v1.conversations.schemas import ConversationSummary, DailySummaryResponse, MessageResponse
 from src.infrastructure.persistence.postgres.models.conversation import ConversationModel
+from src.infrastructure.persistence.postgres.models.message import MessageModel
+from src.infrastructure.persistence.postgres.models.question import QuestionModel
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -45,6 +48,49 @@ async def list_conversations(
         )
         for c in result.scalars().all()
     ]
+
+
+@router.get("/daily-summary")
+async def daily_summary(current_user: CurrentUser, uow: UnitOfWorkDep) -> DailySummaryResponse:
+    """What happened today — message count, conversation count, question count."""
+    tenant_id = await _resolve_tenant_id(current_user, uow)
+    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    session = uow._session
+
+    msg_count = (
+        await session.execute(
+            select(func.count(MessageModel.id)).where(
+                MessageModel.tenant_id == tenant_id,
+                MessageModel.created_at >= today,
+                MessageModel.hidden.is_(False),
+            )
+        )
+    ).scalar_one()
+
+    conv_count = (
+        await session.execute(
+            select(func.count(ConversationModel.id)).where(
+                ConversationModel.tenant_id == tenant_id,
+                ConversationModel.last_message_at >= today,
+            )
+        )
+    ).scalar_one()
+
+    question_count = (
+        await session.execute(
+            select(func.count(QuestionModel.id)).where(
+                QuestionModel.tenant_id == tenant_id,
+                QuestionModel.created_at >= today,
+            )
+        )
+    ).scalar_one()
+
+    return DailySummaryResponse(
+        date=today.date().isoformat(),
+        total_messages=int(msg_count),
+        active_conversations=int(conv_count),
+        questions_escalated=int(question_count),
+    )
 
 
 @router.get("/{conversation_id}/messages")
