@@ -1,4 +1,5 @@
 """Full end-to-end integration test — register + settings + questions + conversations."""
+
 from __future__ import annotations
 
 import pytest
@@ -36,11 +37,15 @@ async def test_owner_full_onboarding_flow(client: AsyncClient) -> None:
     assert resp.json() == []
 
     # 6. Submit a question
-    resp = await client.post("/api/v1/questions", json={
-        "channel": "whatsapp",
-        "question_text": "What are your office hours?",
-        "asker_name": "Sara",
-    }, headers=h)
+    resp = await client.post(
+        "/api/v1/questions",
+        json={
+            "channel": "whatsapp",
+            "question_text": "What are your office hours?",
+            "asker_name": "Sara",
+        },
+        headers=h,
+    )
     assert resp.status_code == 201
     q_id = resp.json()["id"]
 
