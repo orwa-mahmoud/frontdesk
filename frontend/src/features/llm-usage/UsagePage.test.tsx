@@ -128,6 +128,16 @@ describe("UsagePage", () => {
     });
   });
 
+  it("formats NaN cost as $0.00", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: { ...STATS, total_cost: "not-a-number" },
+    });
+    render(<UsagePage />, { wrapper: createWrapper() });
+    await waitFor(() => {
+      expect(screen.getByText("$0.00")).toBeInTheDocument();
+    });
+  });
+
   it("formats small token counts as plain numbers", async () => {
     vi.mocked(api.get).mockResolvedValue({
       data: { ...STATS, total_output_tokens: 42 },

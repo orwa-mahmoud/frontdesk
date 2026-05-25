@@ -33,4 +33,9 @@ describe("main", () => {
     expect(createRoot).toHaveBeenCalledWith(rootEl);
     expect(mockRender).toHaveBeenCalled();
   });
+
+  it("throws when #root element is missing", async () => {
+    rootEl.remove();
+    await expect(import("./main")).rejects.toThrow("Missing #root element");
+  });
 });
