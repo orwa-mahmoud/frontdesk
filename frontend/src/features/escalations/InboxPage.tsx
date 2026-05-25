@@ -99,7 +99,7 @@ export function InboxPage() {
         <Group>
           <SegmentedControl
             value={filter}
-            onChange={(v) => setFilter(v as QuestionStatus | "all")}
+            onChange={(v: string) => setFilter(v as QuestionStatus | "all")}
             data={[
               { label: "Open", value: "submitted" },
               { label: "Resolved", value: "resolved" },

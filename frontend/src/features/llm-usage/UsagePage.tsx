@@ -30,11 +30,11 @@ function StatCard({
   label,
   value,
   hint,
-}: {
+}: Readonly<{
   label: string;
   value: string | number;
   hint?: string;
-}) {
+}>) {
   return (
     <Card withBorder radius="md" p="lg" h="100%">
       <Text size="xs" tt="uppercase" c="dimmed" fw={600}>

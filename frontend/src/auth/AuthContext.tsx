@@ -6,7 +6,7 @@ import * as authApi from "./api";
 import { AuthContext, type AuthContextValue } from "./context";
 import type { MeResponse } from "./types";
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [user, setUser] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
 

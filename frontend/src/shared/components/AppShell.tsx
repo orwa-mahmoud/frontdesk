@@ -30,7 +30,7 @@ const NAV_ITEMS: Array<{ label: string; to: string; icon: ReactNode }> = [
   { label: "Usage & cost", to: "/usage", icon: <IconChartBar size={18} stroke={1.6} /> },
 ];
 
-export function ProtectedShell({ children }: { children: ReactNode }) {
+export function ProtectedShell({ children }: Readonly<{ children: ReactNode }>) {
   const { user, logout } = useAuth();
   const location = useLocation();
 
