@@ -61,11 +61,9 @@ Edit `.env` and fill in the required values:
 | `DATABASE_URL_TEST` | Yes | Test database: `postgresql+asyncpg://user:pass@localhost:5432/frontdesk_test` |
 | `REDIS_URL` | Yes | Redis connection: `redis://localhost:6379/0` |
 | `JWT_SECRET_KEY` | Yes | Random 256-bit string for JWT signing |
-| `OPENAI_API_KEY` | For RAG | Required if using OpenAI for embeddings/LLM |
-| `ANTHROPIC_API_KEY` | Optional | For Anthropic (Claude) LLM provider |
-| `GOOGLE_API_KEY` | Optional | For Google Gemini LLM provider |
+| `ENCRYPTION_KEY` | Prod | Fernet key for encrypting tenant secrets at rest. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 
-Per-tenant LLM and embedding credentials are stored in the `tenant_configs` table. The env vars above serve as defaults for tenants without custom config.
+All LLM, embedding, and channel credentials are strictly per-tenant via the `tenant_configs` table. There are no global API key env vars.
 
 ---
 

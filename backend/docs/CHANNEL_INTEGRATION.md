@@ -114,6 +114,7 @@ Uses the Meta Cloud API v23.0. Credentials come from `TenantConfig` (per-tenant,
 | `phone_number_id` | `TenantConfig.whatsapp_phone_number_id` |
 | `access_token` | `TenantConfig.whatsapp_access_token` |
 | `verify_token` | `TenantConfig.whatsapp_verify_token` |
+| `app_secret` | `TenantConfig.whatsapp_app_secret` |
 
 ### Incoming Message Parsing
 
@@ -150,7 +151,7 @@ All sends POST to `graph.facebook.com/v23.0/{phone_number_id}/messages`.
 verify_signature(
     payload_body: bytes,
     signature: str,          # X-Hub-Signature-256 header
-    app_secret: str,         # tenant's whatsapp_verify_token
+    app_secret: str,         # tenant's whatsapp_app_secret
     timestamp: str | None,   # optional, for replay protection
     max_age_seconds: int,    # default 300 (5 minutes)
 )

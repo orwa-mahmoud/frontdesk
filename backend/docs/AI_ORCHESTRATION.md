@@ -146,12 +146,12 @@ Tools are defined as framework-agnostic `ToolDef` objects with a name, descripti
 | ---- | ---- | ------- | ----- |
 | `search_documents` | `ai/tools/search_documents.py` | RAG retrieval from the tenant's knowledge base | `RetrieveForQueryUseCase` -> `HybridRetriever.hybrid_retrieve()` |
 | `escalate_question` | `ai/tools/escalate_question.py` | Forward a question the AI cannot answer to the owner | `SubmitQuestionUseCase` -> creates `Question` entity in SUBMITTED status |
-| `save_key_fact` | `ai/tools/save_key_fact.py` | Remember a persistent fact about the current contact | `PostgresKeyFactRepository.save()` (upserts by key) |
-| `remove_key_fact` | `ai/tools/remove_key_fact.py` | Forget a previously saved fact | `PostgresKeyFactRepository.delete()` |
+| `save_key_fact` | `ai/tools/save_key_fact.py` | Remember a persistent fact about the current contact | `uow.key_facts.save()` (upserts by key) |
+| `remove_key_fact` | `ai/tools/remove_key_fact.py` | Forget a previously saved fact | `uow.key_facts.delete()` |
 
-**Tool registration:** The gateway defines `_TOOLS = [SEARCH_DOCUMENTS_DEF, ESCALATE_QUESTION_DEF, SAVE_KEY_FACT_DEF]`. The graph's `_dispatch_tool()` handles routing (including `save_key_fact` which is wired through the graph but not in the fallback agent's dispatcher).
+**Tool registration:** The gateway defines `_TOOLS = [SEARCH_DOCUMENTS_DEF, ESCALATE_QUESTION_DEF, SAVE_KEY_FACT_DEF, REMOVE_KEY_FACT_DEF]`. The graph's `_dispatch_tool()` handles routing for all four tools.
 
-**Rule:** Agent tools must call use cases, never repos or ORM models directly. The `save_key_fact` and `remove_key_fact` tools are a known exception for v1 -- they use the repo directly for simplicity.
+**Rule:** Agent tools must call use cases or go through the UoW, never instantiate repos directly.
 
 ---
 
