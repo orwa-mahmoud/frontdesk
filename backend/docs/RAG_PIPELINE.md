@@ -223,9 +223,9 @@ Value objects in `domain/rag/value_objects.py`: `TextChunk(index, content)` and 
 
 ---
 
-## Future
+## Reranking
 
-The `RetrievedChunk` shape carries enough metadata to feed a cross-encoder reranker (Stage 4) when added. The contract is shaped for it -- no schema changes needed.
+The retriever supports an optional `RerankerPort` (Step 4, after RRF fusion). A `PassThroughReranker` (no-op) is used by default. To enable real reranking, implement `RerankerPort` (e.g. Cohere Rerank, cross-encoder) and inject it when constructing the `HybridRetriever`.
 
 ---
 
