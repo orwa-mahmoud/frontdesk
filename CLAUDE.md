@@ -106,8 +106,8 @@ Backend:
 cd backend
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
-uv run mypy src/                       # strict mode, must be 0 errors
-uv run pytest tests/ --tb=short -q
+uv run mypy src/
+uv run pytest --tb=short -q --cov=src
 ```
 
 Frontend:
@@ -116,6 +116,19 @@ cd frontend
 npm run lint
 npm run typecheck
 npm test
+npm run build
+```
+
+SonarQube (both must be 0/0/0):
+```bash
+cd backend && uv run pytest --cov=src --cov-report=xml -q && sonar-scanner -Dsonar.host.url=http://localhost:9000
+cd frontend && sonar-scanner -Dsonar.host.url=http://localhost:9000
+```
+
+DDD layer audit (must return empty):
+```bash
+grep -rn "^from src\.\(infrastructure\|drivers\|ai\)" backend/src/application/
+grep -rn "^from langchain\|^from langgraph" backend/src/domain/ backend/src/application/
 ```
 
 ## Things to NEVER do
