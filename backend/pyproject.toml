@@ -130,3 +130,4 @@ markers = [
 [tool.coverage.run]
 source = ["src"]
 omit = ["alembic/*", "tests/*", "scripts/*"]
+concurrency = ["greenlet", "thread"]
