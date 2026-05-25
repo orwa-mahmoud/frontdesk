@@ -358,6 +358,39 @@ describe("SettingsPage", () => {
     });
   });
 
+  it("submits Telegram form with webhook_secret", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateTelegram).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Telegram Bot")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Telegram Bot"));
+    await waitFor(() => expect(screen.getByText("Save Telegram config")).toBeInTheDocument());
+
+    const webhookInputs = screen.getAllByLabelText("Webhook Secret");
+    fireEvent.change(webhookInputs.at(-1)!, { target: { value: "ws-new" } });
+    fireEvent.click(screen.getByText("Save Telegram config"));
+
+    await waitFor(() => {
+      expect(updateTelegram).toHaveBeenCalledWith(expect.objectContaining({ webhook_secret: "ws-new" }), expect.anything());
+    });
+  });
+
+  it("submits Embedding form with model and dimensions", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateEmbedding).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Embedding Configuration")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Embedding Configuration"));
+    await waitFor(() => expect(screen.getByText("Save embedding config")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Save embedding config"));
+    await waitFor(() => {
+      expect(updateEmbedding).toHaveBeenCalled();
+    });
+  });
+
   it("renders with null whatsapp/telegram config", async () => {
     vi.mocked(getSettings).mockResolvedValue({
       ...CONFIG,
@@ -369,5 +402,128 @@ describe("SettingsPage", () => {
     });
     render(<SettingsPage />, { wrapper: createWrapper() });
     await waitFor(() => expect(screen.getByText("Settings")).toBeInTheDocument());
+  });
+
+  it("submits LLM form with provider selected", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateLLM).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Save LLM config")).toBeInTheDocument());
+
+    const providerInputs = screen.getAllByLabelText("Provider");
+    fireEvent.click(providerInputs[0]);
+    await waitFor(() => expect(screen.getByText("Anthropic")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Anthropic"));
+    fireEvent.click(screen.getByText("Save LLM config"));
+
+    await waitFor(() => {
+      expect(updateLLM).toHaveBeenCalledWith(expect.objectContaining({ provider: "anthropic" }), expect.anything());
+    });
+  });
+
+  it("submits Bot form with language selected", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateBot).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Bot Personality")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Bot Personality"));
+    await waitFor(() => expect(screen.getByText("Save bot config")).toBeInTheDocument());
+
+    const langInputs = screen.getAllByLabelText("Language");
+    fireEvent.click(langInputs.at(-1)!);
+    await waitFor(() => expect(screen.getByText("Arabic")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Arabic"));
+    fireEvent.click(screen.getByText("Save bot config"));
+
+    await waitFor(() => {
+      expect(updateBot).toHaveBeenCalledWith(expect.objectContaining({ language: "ar" }), expect.anything());
+    });
+  });
+
+  it("submits Embedding form with model filled", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateEmbedding).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Embedding Configuration")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Embedding Configuration"));
+    await waitFor(() => expect(screen.getByText("Save embedding config")).toBeInTheDocument());
+
+    const modelInputs = screen.getAllByLabelText("Model");
+    fireEvent.change(modelInputs.at(-1)!, { target: { value: "ada-002" } });
+    fireEvent.click(screen.getByText("Save embedding config"));
+
+    await waitFor(() => {
+      expect(updateEmbedding).toHaveBeenCalledWith(expect.objectContaining({ model: "ada-002" }), expect.anything());
+    });
+  });
+
+  it("renders with empty embedding key (shows 'Using LLM key')", async () => {
+    vi.mocked(getSettings).mockResolvedValue({ ...CONFIG, embedding_api_key_masked: "" });
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Embedding Configuration")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Embedding Configuration"));
+    await waitFor(() => expect(screen.getByText(/using llm key/i)).toBeInTheDocument());
+  });
+
+  it("shows 'Current: ...' when embedding key is set", async () => {
+    vi.mocked(getSettings).mockResolvedValue({ ...CONFIG, embedding_api_key_masked: "emb-****" });
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Embedding Configuration")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Embedding Configuration"));
+    await waitFor(() => expect(screen.getByText(/current: emb-/i)).toBeInTheDocument());
+  });
+
+  it("shows 'Not set' when LLM key is empty", async () => {
+    vi.mocked(getSettings).mockResolvedValue({ ...CONFIG, llm_api_key_masked: "" });
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Save LLM config")).toBeInTheDocument());
+    expect(screen.getByText("Not set")).toBeInTheDocument();
+  });
+
+  it("submits LLM form with cleared max_tokens", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateLLM).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Save LLM config")).toBeInTheDocument());
+
+    const maxTokensInput = screen.getByLabelText("Max tokens");
+    fireEvent.change(maxTokensInput, { target: { value: "" } });
+    const tempInput = screen.getByLabelText("Temperature");
+    fireEvent.change(tempInput, { target: { value: "" } });
+    fireEvent.click(screen.getByText("Save LLM config"));
+
+    await waitFor(() => expect(updateLLM).toHaveBeenCalled());
+  });
+
+  it("submits Embedding form with cleared dimensions", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateEmbedding).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Embedding Configuration")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Embedding Configuration"));
+    await waitFor(() => expect(screen.getByText("Save embedding config")).toBeInTheDocument());
+
+    const dimInputs = screen.getAllByLabelText("Dimensions");
+    fireEvent.change(dimInputs.at(-1)!, { target: { value: "" } });
+    fireEvent.click(screen.getByText("Save embedding config"));
+
+    await waitFor(() => expect(updateEmbedding).toHaveBeenCalled());
+  });
+
+  it("shows 'Not set' descriptions for empty WhatsApp tokens", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      ...CONFIG,
+      whatsapp_access_token_masked: null,
+      whatsapp_verify_token_masked: null,
+      telegram_bot_token_masked: null,
+      telegram_webhook_secret_masked: null,
+    });
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("WhatsApp Cloud API")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("WhatsApp Cloud API"));
+    await waitFor(() => expect(screen.getByText("Save WhatsApp config")).toBeInTheDocument());
   });
 });

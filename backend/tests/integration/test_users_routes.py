@@ -29,7 +29,7 @@ async def test_update_full_name_returns_profile(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_update_password_then_login(client: AsyncClient) -> None:
     """After changing the password, the old one should fail and the new one should work."""
-    import uuid  # noqa: PLC0415
+    import uuid
 
     slug = f"t-{uuid.uuid4().hex[:8]}"
     email = f"{slug}@test.com"

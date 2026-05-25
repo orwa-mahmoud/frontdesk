@@ -142,7 +142,7 @@ async def test_chat_with_tools_basic(mock_init: MagicMock) -> None:
     mock_chat.ainvoke = AsyncMock(return_value=response)
     mock_init.return_value = mock_chat
 
-    from src.infrastructure.llm.client import LangChainLLMClient  # noqa: PLC0415
+    from src.infrastructure.llm.client import LangChainLLMClient
 
     client = LangChainLLMClient(provider="openai", model="gpt-4o", api_key="sk-test")
 
@@ -174,7 +174,7 @@ async def test_chat_with_tools_binds_params(mock_init: MagicMock) -> None:
     mock_chat.bind = MagicMock(return_value=bound_chat)
     mock_init.return_value = mock_chat
 
-    from src.infrastructure.llm.client import LangChainLLMClient  # noqa: PLC0415
+    from src.infrastructure.llm.client import LangChainLLMClient
 
     client = LangChainLLMClient(provider="openai", model="gpt-4o")
 
