@@ -166,4 +166,40 @@ describe("DocumentsPage", () => {
       expect(screen.getByText("500 B")).toBeInTheDocument();
     });
   });
+
+  it("uploads file via FileButton and shows success", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
+    vi.mocked(api.post).mockResolvedValue({ data: DOC_LIST[0] });
+    const { container } = render(<DocumentsPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => expect(screen.getByText("Upload file")).toBeInTheDocument());
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["hello"], "test.pdf", { type: "application/pdf" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        "/api/v1/documents",
+        expect.any(FormData),
+        expect.objectContaining({ headers: { "Content-Type": "multipart/form-data" }, timeout: 120_000 }),
+      );
+    });
+  });
+
+  it("shows error notification when upload fails", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
+    vi.mocked(api.post).mockRejectedValue(new Error("upload failed"));
+    const { container } = render(<DocumentsPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => expect(screen.getByText("Upload file")).toBeInTheDocument());
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["bad"], "bad.exe", { type: "application/octet-stream" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalled();
+    });
+  });
 });

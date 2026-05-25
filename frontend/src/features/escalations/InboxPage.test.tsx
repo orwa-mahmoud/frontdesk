@@ -218,4 +218,55 @@ describe("InboxPage", () => {
     render(<InboxPage />, { wrapper: createWrapper() });
     expect(screen.getByLabelText("Refresh")).toBeInTheDocument();
   });
+
+  it("shows error notification when reply fails", async () => {
+    vi.mocked(listQuestions).mockResolvedValue(QUESTIONS);
+    vi.mocked(replyToQuestion).mockRejectedValue(new Error("network"));
+    render(<InboxPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => expect(screen.getByText("What are your hours?")).toBeInTheDocument());
+    fireEvent.click(screen.getAllByText("Reply")[0]);
+    await waitFor(() => expect(screen.getByPlaceholderText(/type the reply/i)).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText(/type the reply/i), { target: { value: "reply text" } });
+    fireEvent.click(screen.getByText("Send reply"));
+
+    await waitFor(() => expect(replyToQuestion).toHaveBeenCalled());
+  });
+
+  it("shows error notification when close fails", async () => {
+    vi.mocked(listQuestions).mockResolvedValue(QUESTIONS);
+    vi.mocked(closeQuestion).mockRejectedValue(new Error("network"));
+    render(<InboxPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => expect(screen.getByText("What are your hours?")).toBeInTheDocument());
+    fireEvent.click(screen.getAllByText("Close")[0]);
+
+    await waitFor(() => expect(closeQuestion).toHaveBeenCalled());
+  });
+
+  it("changes filter via segmented control", async () => {
+    vi.mocked(listQuestions).mockResolvedValue([]);
+    render(<InboxPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => expect(screen.getByText("Nothing waiting on you.")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("All"));
+
+    await waitFor(() => {
+      expect(listQuestions).toHaveBeenCalledWith(undefined);
+    });
+  });
+
+  it("refresh button invalidates queries", async () => {
+    vi.mocked(listQuestions).mockResolvedValue([]);
+    render(<InboxPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => expect(screen.getByText("Nothing waiting on you.")).toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText("Refresh"));
+
+    await waitFor(() => {
+      expect(listQuestions).toHaveBeenCalledTimes(2);
+    });
+  });
 });

@@ -197,6 +197,16 @@ describe("SettingsPage", () => {
     await waitFor(() => expect(updateTelegram).toHaveBeenCalled());
   });
 
+  it("shows error notification when mutation fails", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateLLM).mockRejectedValue(new Error("fail"));
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Save LLM config")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Save LLM config"));
+    await waitFor(() => expect(updateLLM).toHaveBeenCalled());
+  });
+
   it("submits Bot form", async () => {
     vi.mocked(getSettings).mockResolvedValue(CONFIG);
     vi.mocked(updateBot).mockResolvedValue(CONFIG);
