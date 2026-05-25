@@ -161,7 +161,7 @@ async def test_telegram_webhook_happy_path_with_reply() -> None:
 @pytest.mark.asyncio
 async def test_telegram_webhook_exception_rolls_back() -> None:
     tid = uuid4()
-    config = _make_config(tenant_id=tid, webhook_secret=None)
+    config = _make_config(tenant_id=tid, webhook_secret="test-sec")
 
     mock_uow = MagicMock()
     mock_uow.tenant_configs = MagicMock()
@@ -187,6 +187,7 @@ async def test_telegram_webhook_exception_rolls_back() -> None:
         resp = await telegram_webhook(
             tenant_id=str(tid),
             request=request,
+            x_telegram_bot_api_secret_token="test-sec",
         )
     assert resp.status_code == 200
     mock_uow.rollback.assert_awaited_once()

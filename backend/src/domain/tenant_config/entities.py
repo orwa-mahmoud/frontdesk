@@ -56,7 +56,7 @@ class TenantConfig(BaseEntity):
     @classmethod
     def create_default(cls, *, tenant_id: UUID) -> TenantConfig:
         now = datetime.now(UTC)
-        return cls(
+        config = cls(
             id=uuid4(),
             tenant_id=tenant_id,
             llm_provider=LLMProvider.OPENAI,
@@ -80,7 +80,8 @@ class TenantConfig(BaseEntity):
             created_at=now,
             updated_at=now,
         )
-        # _is_new is set by the caller (register use case)
+        config._is_new = True
+        return config
 
     def update_llm(
         self,

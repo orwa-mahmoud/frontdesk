@@ -32,12 +32,12 @@ class PostgresContactRepository:
 
         contact = Contact.create(tenant_id=tenant_id, phone=phone, name=name)
         try:
-            self._session.add(self._to_model(contact))
-            await self._session.flush()
+            async with self._session.begin_nested():
+                self._session.add(self._to_model(contact))
+                await self._session.flush()
             contact.mark_persisted()
         except IntegrityError:
             logger.debug("contact.get_or_create.race", phone=phone, tenant_id=str(tenant_id))
-            await self._session.rollback()
             existing = await self._get_by_phone(tenant_id, phone)
             if existing is not None:
                 return existing

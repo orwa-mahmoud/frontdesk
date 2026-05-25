@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Query, status
 
 from src.application.questions.commands import CloseQuestion, ReplyToQuestion, SubmitQuestion
@@ -22,6 +23,7 @@ from src.application.questions.use_cases.list_questions import (
 )
 from src.application.questions.use_cases.reply_to_question import ReplyToQuestionUseCase
 from src.application.questions.use_cases.submit_question import SubmitQuestionUseCase
+from src.domain.conversations.value_objects import ConversationChannel
 from src.domain.questions.value_objects import QuestionStatus
 from src.domain.shared.exceptions import AuthenticationError
 from src.drivers.api.dependencies import CurrentUser, UnitOfWorkDep
@@ -39,6 +41,40 @@ async def _resolve_tenant_id(current_user: CurrentUser, uow: UnitOfWorkDep) -> U
     if not links:
         raise AuthenticationError("User is not associated with any tenant")
     return links[0].tenant_id
+
+
+logger = structlog.get_logger()
+
+
+async def _deliver_reply(dto: object, uow: UnitOfWorkDep) -> None:
+    """Best-effort: send the owner's reply back to the asker via the original channel."""
+    from src.application.questions.dtos import QuestionDTO  # noqa: PLC0415
+
+    assert isinstance(dto, QuestionDTO)
+    if not dto.owner_reply or not dto.contact_id or not dto.channel:
+        return
+
+    try:
+        contact = await uow.contacts.get_by_id(dto.contact_id)
+        if not contact or not contact.phone:
+            return
+        config = await uow.tenant_configs.get_by_tenant_id(dto.tenant_id)
+        if not config:
+            return
+
+        channel = ConversationChannel(dto.channel)
+        if channel == ConversationChannel.WHATSAPP and config.whatsapp_access_token:
+            from src.infrastructure.channels.whatsapp import WhatsAppAdapter  # noqa: PLC0415
+
+            wa = WhatsAppAdapter(tenant_config=config)
+            await wa.send_text(contact.phone, dto.owner_reply)
+        elif channel == ConversationChannel.TELEGRAM and config.telegram_bot_token:
+            from src.infrastructure.channels.telegram import TelegramAdapter  # noqa: PLC0415
+
+            tg = TelegramAdapter(tenant_config=config)  # type: ignore[arg-type]
+            await tg.send_text(contact.phone, dto.owner_reply)
+    except Exception:
+        logger.warning("question.reply_delivery.failed", question_id=str(dto.id), exc_info=True)
 
 
 def _to_response(dto: object) -> QuestionResponse:
@@ -122,6 +158,7 @@ async def reply(
             reply=req.reply,
         )
     )
+    await _deliver_reply(dto, uow)
     return _to_response(dto)
 
 
