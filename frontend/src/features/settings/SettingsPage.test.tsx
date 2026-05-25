@@ -220,6 +220,41 @@ describe("SettingsPage", () => {
     await waitFor(() => expect(updateBot).toHaveBeenCalled());
   });
 
+  it("submits WhatsApp form with access_token and verify_token", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateWhatsApp).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("WhatsApp Cloud API")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("WhatsApp Cloud API"));
+    await waitFor(() => expect(screen.getByText("Save WhatsApp config")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Access Token"), { target: { value: "EAA-new" } });
+    fireEvent.change(screen.getByLabelText("Verify Token"), { target: { value: "vt-new" } });
+    fireEvent.click(screen.getByText("Save WhatsApp config"));
+
+    await waitFor(() => {
+      expect(updateWhatsApp).toHaveBeenCalledWith(
+        expect.objectContaining({ access_token: "EAA-new", verify_token: "vt-new" }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it("submits LLM form with api_key filled", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateLLM).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Save LLM config")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "sk-test-key" } });
+    fireEvent.click(screen.getByText("Save LLM config"));
+
+    await waitFor(() => {
+      expect(updateLLM).toHaveBeenCalledWith(expect.objectContaining({ api_key: "sk-test-key" }), expect.anything());
+    });
+  });
+
   it("submits LLM form with filled model field", async () => {
     vi.mocked(getSettings).mockResolvedValue(CONFIG);
     vi.mocked(updateLLM).mockResolvedValue(CONFIG);
@@ -267,6 +302,59 @@ describe("SettingsPage", () => {
 
     await waitFor(() => {
       expect(updateBot).toHaveBeenCalledWith(expect.objectContaining({ name: "NewBot" }), expect.anything());
+    });
+  });
+
+  it("submits Telegram form with filled bot_token", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateTelegram).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Telegram Bot")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Telegram Bot"));
+    await waitFor(() => expect(screen.getByText("Save Telegram config")).toBeInTheDocument());
+
+    const botTokenInputs = screen.getAllByLabelText("Bot Token");
+    fireEvent.change(botTokenInputs.at(-1)!, { target: { value: "123:NEWTOKEN" } });
+    fireEvent.click(screen.getByText("Save Telegram config"));
+
+    await waitFor(() => {
+      expect(updateTelegram).toHaveBeenCalledWith(expect.objectContaining({ bot_token: "123:NEWTOKEN" }), expect.anything());
+    });
+  });
+
+  it("submits Embedding form with filled api_key", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateEmbedding).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Embedding Configuration")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Embedding Configuration"));
+    await waitFor(() => expect(screen.getByText("Save embedding config")).toBeInTheDocument());
+
+    const apiKeyInputs = screen.getAllByLabelText(/api key/i);
+    fireEvent.change(apiKeyInputs.at(-1)!, { target: { value: "sk-new-key" } });
+    fireEvent.click(screen.getByText("Save embedding config"));
+
+    await waitFor(() => {
+      expect(updateEmbedding).toHaveBeenCalledWith(expect.objectContaining({ api_key: "sk-new-key" }), expect.anything());
+    });
+  });
+
+  it("submits Bot form with welcome_message and language", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateBot).mockResolvedValue(CONFIG);
+    render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Bot Personality")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Bot Personality"));
+    await waitFor(() => expect(screen.getByText("Save bot config")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Welcome Message"), { target: { value: "Welcome!" } });
+    fireEvent.click(screen.getByText("Save bot config"));
+
+    await waitFor(() => {
+      expect(updateBot).toHaveBeenCalledWith(expect.objectContaining({ welcome_message: "Welcome!" }), expect.anything());
     });
   });
 
