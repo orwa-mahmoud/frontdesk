@@ -11,7 +11,6 @@ from collections.abc import Sequence
 
 from openai import AsyncOpenAI
 
-from src.config.settings import get_settings
 from src.domain.shared.exceptions import InvalidOperationError
 
 
@@ -21,14 +20,13 @@ class OpenAIEmbedder:
     def __init__(
         self,
         *,
-        api_key: str | None = None,
-        model: str | None = None,
-        dimensions: int | None = None,
+        api_key: str,
+        model: str,
+        dimensions: int,
     ) -> None:
-        settings = get_settings()
-        self._api_key = api_key or settings.openai_api_key or ""
-        self._model = model or settings.default_embedding_model
-        self._dimensions = dimensions or settings.default_embedding_dimensions
+        self._api_key = api_key
+        self._model = model
+        self._dimensions = dimensions
         self._client: AsyncOpenAI | None = None
 
     def _get_client(self) -> AsyncOpenAI:

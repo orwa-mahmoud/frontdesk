@@ -12,7 +12,9 @@ from src.application.documents.queries import ListDocuments, RetrieveForQuery
 from src.application.documents.use_cases.ingest_document import IngestDocumentUseCase
 from src.application.documents.use_cases.list_documents import DeleteDocumentUseCase, ListDocumentsUseCase
 from src.application.documents.use_cases.retrieve_for_query import RetrieveForQueryUseCase
-from src.domain.shared.exceptions import AuthenticationError
+from src.application.shared.unit_of_work import UnitOfWork
+from src.domain.shared.exceptions import AuthenticationError, EntityNotFoundError
+from src.domain.tenant_config.entities import TenantConfig
 from src.drivers.api.dependencies import CurrentUser, UnitOfWorkDep
 from src.drivers.api.v1.documents.schemas import (
     DocumentSummary,
@@ -36,6 +38,21 @@ async def _resolve_tenant_id(current_user: CurrentUser, uow: UnitOfWorkDep) -> U
     return links[0].tenant_id
 
 
+async def _load_tenant_config(tenant_id: UUID, uow: UnitOfWork) -> TenantConfig:
+    config: TenantConfig | None = await uow.tenant_configs.get_by_tenant_id(tenant_id)
+    if config is None:
+        raise EntityNotFoundError("Tenant configuration not found")
+    return config
+
+
+def _build_embedder(config: TenantConfig) -> OpenAIEmbedder:
+    return OpenAIEmbedder(
+        api_key=config.embedding_api_key or config.llm_api_key,
+        model=config.embedding_model,
+        dimensions=config.embedding_dimensions,
+    )
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -54,11 +71,12 @@ async def upload_document(
         raise HTTPException(status_code=413, detail="File too large (25 MB max)")
 
     tenant_id = await _resolve_tenant_id(current_user, uow)
+    config = await _load_tenant_config(tenant_id, uow)
 
     use_case = IngestDocumentUseCase(
         uow=uow,
         chunker=RecursiveTokenChunker(),
-        embedder=OpenAIEmbedder(),
+        embedder=_build_embedder(config),
     )
     dto = await use_case.execute(
         IngestDocument(
@@ -120,7 +138,8 @@ async def retrieve(
     """Test endpoint: run the hybrid retriever and return the matched chunks
     + RRF scores. Useful for tuning the index and for the future "trace" UI."""
     tenant_id = await _resolve_tenant_id(current_user, uow)
-    retriever = HybridRetriever(session=uow._session, embedder=OpenAIEmbedder())
+    config = await _load_tenant_config(tenant_id, uow)
+    retriever = HybridRetriever(session=uow._session, embedder=_build_embedder(config))
     dtos = await RetrieveForQueryUseCase(retriever=retriever).execute(
         RetrieveForQuery(tenant_id=tenant_id, query=req.query, top_k=req.top_k)
     )
