@@ -1,8 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+
+vi.mock("../auth/AuthContext", () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+import { Providers } from "./Providers";
 
 describe("Providers", () => {
-  it("module exports Providers function", async () => {
-    const mod = await import("./Providers");
-    expect(typeof mod.Providers).toBe("function");
+  it("renders children within all provider layers", () => {
+    render(
+      <Providers>
+        <div>App Content</div>
+      </Providers>
+    );
+    expect(screen.getByText("App Content")).toBeInTheDocument();
   });
 });
