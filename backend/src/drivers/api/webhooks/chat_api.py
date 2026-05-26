@@ -7,13 +7,8 @@ without setting up WhatsApp or Telegram.
 
 from __future__ import annotations
 
-import asyncio
-import json
-from collections.abc import AsyncIterator
-
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
-from starlette.responses import StreamingResponse
 
 from src.ai.gateway import chat_with_agent
 from src.ai.types import ChatInput
@@ -62,36 +57,3 @@ async def chat(request: Request, req: ChatRequest, current_user: CurrentUser, uo
         escalated=result.escalated,
         request_id=result.request_id,
     )
-
-
-@router.post("/stream")
-@limiter.limit("10/minute")
-async def chat_stream(
-    request: Request, req: ChatRequest, current_user: CurrentUser, uow: UnitOfWorkDep
-) -> StreamingResponse:
-    """SSE streaming endpoint — sends the agent response as token-sized chunks."""
-    links = await uow.user_tenants.list_for_user(current_user.id)
-    if not links:
-        raise AuthenticationError("User is not associated with any tenant")
-    tenant_id = links[0].tenant_id
-
-    result = await chat_with_agent(
-        ChatInput(
-            message=req.message,
-            tenant_id=tenant_id,
-            channel=ConversationChannel.API,
-            sender_identifier=current_user.email,
-            sender_name=current_user.full_name,
-        ),
-        uow=uow,
-    )
-
-    async def _sse_generator() -> AsyncIterator[str]:
-        words = result.response.split(" ")
-        for i, word in enumerate(words):
-            chunk = word if i == 0 else f" {word}"
-            yield f"data: {json.dumps({'token': chunk})}\n\n"
-            await asyncio.sleep(0.02)
-        yield f"data: {json.dumps({'done': True, 'thread_id': result.thread_id, 'escalated': result.escalated})}\n\n"
-
-    return StreamingResponse(_sse_generator(), media_type="text/event-stream")
