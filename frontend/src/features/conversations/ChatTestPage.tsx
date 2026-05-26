@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api } from "../../core/api/client";
 
 interface ChatMessage {
+  id: string;
   role: "user" | "assistant";
   content: string;
 }
@@ -27,7 +28,7 @@ export function ChatTestPage() {
     const text = input.trim();
     if (!text) return;
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: text }]);
     setSending(true);
 
     try {
@@ -37,7 +38,7 @@ export function ChatTestPage() {
       if (data.thread_id && !threadId) {
         setThreadId(data.thread_id);
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: data.response }]);
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: data.response }]);
       if (data.escalated) {
         notifications.show({ color: "orange", message: "Question escalated to the owner inbox." });
       }
@@ -65,9 +66,9 @@ export function ChatTestPage() {
                 Send a message to test the agent pipeline.
               </Text>
             )}
-            {messages.map((m, i) => (
+            {messages.map((m) => (
               <Card
-                key={`msg-${i}`}
+                key={m.id}
                 withBorder
                 radius="md"
                 p="sm"
