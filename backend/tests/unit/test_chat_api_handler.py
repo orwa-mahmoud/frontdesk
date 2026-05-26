@@ -1,3 +1,4 @@
+# mypy: disable-error-code="no-untyped-call,no-untyped-def"
 """Unit tests for the /chat endpoint handler logic."""
 
 from __future__ import annotations
@@ -10,6 +11,14 @@ import pytest
 from src.ai.types import ChatResult
 from src.domain.shared.exceptions import AuthenticationError
 from src.drivers.api.webhooks.chat_api import ChatRequest, chat
+
+
+def _mock_request():
+    """Build a minimal Request-like object for slowapi."""
+    from starlette.requests import Request
+
+    scope = {"type": "http", "method": "POST", "path": "/api/v1/chat", "headers": [], "query_string": b""}
+    return Request(scope)
 
 
 def _make_user(*, user_id=None, email="test@t.com", full_name="Test"):
@@ -40,7 +49,7 @@ async def test_chat_no_tenant_link_raises() -> None:
     req = ChatRequest(message="hi")
 
     with pytest.raises(AuthenticationError, match="not associated"):
-        await chat(req, current_user=user, uow=uow)
+        await chat(request=_mock_request(), req=req, current_user=user, uow=uow)
 
 
 @pytest.mark.asyncio
@@ -54,7 +63,7 @@ async def test_chat_happy_path() -> None:
     mock_result = ChatResult(response="Hi!", thread_id="t-1", escalated=False, request_id="r-1")
 
     with patch("src.drivers.api.webhooks.chat_api.chat_with_agent", new_callable=AsyncMock, return_value=mock_result):
-        resp = await chat(req, current_user=user, uow=uow)
+        resp = await chat(request=_mock_request(), req=req, current_user=user, uow=uow)
 
     assert resp.response == "Hi!"
     assert resp.thread_id == "t-1"
@@ -73,6 +82,6 @@ async def test_chat_escalated_result() -> None:
     mock_result = ChatResult(response="Let me connect you.", thread_id="t-2", escalated=True, request_id="r-2")
 
     with patch("src.drivers.api.webhooks.chat_api.chat_with_agent", new_callable=AsyncMock, return_value=mock_result):
-        resp = await chat(req, current_user=user, uow=uow)
+        resp = await chat(request=_mock_request(), req=req, current_user=user, uow=uow)
 
     assert resp.escalated is True
