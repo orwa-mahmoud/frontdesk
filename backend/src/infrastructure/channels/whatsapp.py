@@ -67,6 +67,7 @@ class WhatsAppAdapter(ChannelAdapter):
             self._phone_number_id = tenant_config.whatsapp_phone_number_id or ""
             self._access_token = tenant_config.whatsapp_access_token or ""
             self._verify_token = tenant_config.whatsapp_verify_token or ""
+            self._app_secret = tenant_config.whatsapp_app_secret or ""
 
         if not self._phone_number_id or not self._access_token:
             logger.warning("whatsapp.no_credentials", msg="Meta WhatsApp credentials not configured")
@@ -147,6 +148,7 @@ class WhatsAppAdapter(ChannelAdapter):
             logger.error("whatsapp.media_url.error", error=str(e), media_id=media_id)
             return ""
 
+    @channel_send_retry()
     async def send_text(self, recipient: str, text: str) -> dict[str, Any] | None:
         """Send a text message via Meta Cloud API with retry on transient failures."""
         if not self._phone_number_id or not self._access_token:

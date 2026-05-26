@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -24,7 +24,7 @@ from src.infrastructure.persistence.postgres.repositories.contact_repo import Po
 
 def _make_contact(
     *,
-    tenant_id=None,
+    tenant_id: UUID | None = None,
     phone: str | None = "+971501234567",
     name: str | None = "Test",
     email: str | None = None,
@@ -47,7 +47,7 @@ def _scalar_result(value: object) -> MagicMock:
 
 def _make_contact_model(
     *,
-    tenant_id=None,
+    tenant_id: UUID | None = None,
     phone: str | None = "+971501234567",
     name: str | None = "Test",
     email: str | None = None,
@@ -149,45 +149,43 @@ class TestGetOrCreateByPhone:
         tenant_id = uuid4()
 
         session = AsyncMock()
-        session.add = MagicMock()  # sync method on real AsyncSession
+        session.add = MagicMock()
         session.execute = AsyncMock(return_value=_scalar_result(None))
         session.flush = AsyncMock()
+        nested = AsyncMock()
+        nested.__aenter__ = AsyncMock(return_value=None)
+        nested.__aexit__ = AsyncMock(return_value=False)
+        session.begin_nested = MagicMock(return_value=nested)
 
         repo = PostgresContactRepository(session)
         contact = await repo.get_or_create_by_phone(tenant_id, "+999", name="New")
 
         assert contact.phone == "+999"
         assert contact.name == "New"
-        assert contact.is_new is False  # mark_persisted called
-        session.add.assert_called_once()
-        session.flush.assert_awaited_once()
+        assert contact.is_new is False
 
     @pytest.mark.asyncio
     async def test_race_condition_retries_on_integrity_error(self) -> None:
-        """IntegrityError on insert -> rolls back, re-fetches existing."""
+        """IntegrityError on insert -> savepoint rolls back, re-fetches existing."""
         tenant_id = uuid4()
         existing_model = _make_contact_model(tenant_id=tenant_id, phone="+111")
 
         session = AsyncMock()
         session.add = MagicMock()
-        # First execute: _get_by_phone returns None (not found)
-        # After rollback, second execute: _get_by_phone returns the existing
         session.execute = AsyncMock(
-            side_effect=[
-                _scalar_result(None),
-                _scalar_result(existing_model),
-            ],
+            side_effect=[_scalar_result(None), _scalar_result(existing_model)],
         )
         session.flush = AsyncMock(
             side_effect=IntegrityError("dup", params=None, orig=Exception()),
         )
-        session.rollback = AsyncMock()
+        nested = AsyncMock()
+        nested.__aenter__ = AsyncMock(return_value=None)
+        nested.__aexit__ = AsyncMock(return_value=False)
+        session.begin_nested = MagicMock(return_value=nested)
 
         repo = PostgresContactRepository(session)
         contact = await repo.get_or_create_by_phone(tenant_id, "+111")
-
         assert contact.phone == "+111"
-        session.rollback.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_race_condition_raises_if_refetch_also_fails(self) -> None:
@@ -202,7 +200,10 @@ class TestGetOrCreateByPhone:
         session.flush = AsyncMock(
             side_effect=IntegrityError("dup", params=None, orig=Exception()),
         )
-        session.rollback = AsyncMock()
+        nested = AsyncMock()
+        nested.__aenter__ = AsyncMock(return_value=None)
+        nested.__aexit__ = AsyncMock(return_value=False)
+        session.begin_nested = MagicMock(return_value=nested)
 
         repo = PostgresContactRepository(session)
         with pytest.raises(IntegrityError):

@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,19 +34,28 @@ def get_uow(session: Annotated[AsyncSession, Depends(get_session)]) -> UnitOfWor
     return UnitOfWork(session)
 
 
+_COOKIE_NAME = "frontdesk_token"
+
+
 async def get_current_user(
+    request: Request,
     token: Annotated[str | None, Depends(_oauth2_scheme)],
     uow: Annotated[UnitOfWork, Depends(get_uow)],
 ) -> User:
     if not token:
-        raise AuthenticationError("Missing bearer token")
+        token = request.cookies.get(_COOKIE_NAME)
+    if not token:
+        raise AuthenticationError("Missing authentication")
 
     payload = get_jwt_service().decode(token)
     sub = payload.get("sub")
     if not sub:
         raise AuthenticationError("Token missing subject")
 
-    user_id = UUID(sub)
+    try:
+        user_id = UUID(sub)
+    except ValueError:
+        raise AuthenticationError("Invalid token subject")  # noqa: B904
     user = await uow.users.get_by_id(user_id)
     if user is None or not user.is_active:
         raise AuthenticationError("User no longer exists or is disabled")
@@ -55,3 +64,11 @@ async def get_current_user(
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 UnitOfWorkDep = Annotated[UnitOfWork, Depends(get_uow)]
+
+
+async def resolve_tenant_id(current_user: User, uow: UnitOfWork) -> UUID:
+    """Resolve the tenant ID for the current user. Shared across route files."""
+    links = await uow.user_tenants.list_for_user(current_user.id)
+    if not links:
+        raise AuthenticationError("User is not associated with any tenant")
+    return links[0].tenant_id

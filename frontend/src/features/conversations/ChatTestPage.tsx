@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api } from "../../core/api/client";
 
 interface ChatMessage {
+  id: string;
   role: "user" | "assistant";
   content: string;
 }
@@ -21,17 +22,23 @@ export function ChatTestPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
 
   const send = async () => {
     const text = input.trim();
     if (!text) return;
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: text }]);
     setSending(true);
 
     try {
-      const { data } = await api.post<ChatApiResponse>("/api/v1/chat", { message: text });
-      setMessages((prev) => [...prev, { role: "assistant", content: data.response }]);
+      const payload: Record<string, string> = { message: text };
+      if (threadId) payload.thread_id = threadId;
+      const { data } = await api.post<ChatApiResponse>("/api/v1/chat", payload);
+      if (data.thread_id && !threadId) {
+        setThreadId(data.thread_id);
+      }
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: data.response }]);
       if (data.escalated) {
         notifications.show({ color: "orange", message: "Question escalated to the owner inbox." });
       }
@@ -53,7 +60,7 @@ export function ChatTestPage() {
 
       <Card withBorder radius="md" p={0} style={{ height: "60vh", display: "flex", flexDirection: "column" }}>
         <ScrollArea style={{ flex: 1 }} p="md">
-          <Stack gap="sm">
+          <Stack gap="sm" role="log" aria-live="polite">
             {messages.length === 0 && (
               <Text c="dimmed" ta="center" py="xl">
                 Send a message to test the agent pipeline.
@@ -61,7 +68,7 @@ export function ChatTestPage() {
             )}
             {messages.map((m) => (
               <Card
-                key={`msg-${m.role}-${m.content.slice(0,30)}`}
+                key={m.id}
                 withBorder
                 radius="md"
                 p="sm"
@@ -96,7 +103,7 @@ export function ChatTestPage() {
               }
             }}
           />
-          <Button onClick={() => void send()} loading={sending} leftSection={<IconSend size={16} />}>
+          <Button onClick={() => void send()} loading={sending} disabled={sending} aria-label="Send message" leftSection={<IconSend size={16} />}>
             Send
           </Button>
         </Group>

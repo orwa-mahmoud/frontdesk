@@ -1,12 +1,7 @@
-version: "3.9"
-
 services:
   postgres:
     image: pgvector/pgvector:pg17
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: frontdesk_db
+    env_file: .env.docker
     ports:
       - "5432:5432"
     volumes:
@@ -31,15 +26,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file: .env.docker
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/frontdesk_db
-      DATABASE_URL_SYNC: postgresql://postgres:postgres@postgres:5432/frontdesk_db
-      REDIS_URL: redis://redis:6379/0
-      JWT_SECRET_KEY: change-me-in-production
-      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
-      APP_ENV: production
     depends_on:
       postgres:
         condition: service_healthy

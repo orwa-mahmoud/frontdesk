@@ -30,22 +30,8 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 60
     jwt_refresh_token_expire_days: int = 30
 
-    # ── LLM defaults (per-tenant override stored in DB) ────────────
-    openai_api_key: str | None = None
-    anthropic_api_key: str | None = None
-    google_api_key: str | None = None
-    default_llm_provider: str = "openai"
-    default_llm_model: str = "gpt-4o-mini"
-
-    # ── Embeddings (RAG ingestion pipeline) ────────────────────────
-    default_embedding_provider: str = "openai"
-    default_embedding_model: str = "text-embedding-3-large"
-    default_embedding_dimensions: int = 1536
-
-    # ── Channels ───────────────────────────────────────────────────
-    whatsapp_verify_token: str | None = None
-    whatsapp_app_secret: str | None = None
-    telegram_webhook_secret: str | None = None
+    # ── Encryption (Fernet key for tenant secrets at rest) ─────────
+    encryption_key: str | None = None
 
     # ── Observability ──────────────────────────────────────────────
     otel_exporter_otlp_endpoint: str | None = None

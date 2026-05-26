@@ -20,6 +20,9 @@ logger = structlog.get_logger()
 
 def _on_question_submitted(event: DomainEvent) -> None:
     assert isinstance(event, QuestionSubmitted)
+    from src.infrastructure.metrics import QUESTIONS_SUBMITTED_TOTAL  # noqa: PLC0415
+
+    QUESTIONS_SUBMITTED_TOTAL.labels(channel=event.channel).inc()
     logger.info(
         "event.question_submitted",
         question_id=str(event.question_id),
@@ -30,6 +33,9 @@ def _on_question_submitted(event: DomainEvent) -> None:
 
 def _on_question_resolved(event: DomainEvent) -> None:
     assert isinstance(event, QuestionResolved)
+    from src.infrastructure.metrics import QUESTIONS_RESOLVED_TOTAL  # noqa: PLC0415
+
+    QUESTIONS_RESOLVED_TOTAL.inc()
     logger.info(
         "event.question_resolved",
         question_id=str(event.question_id),

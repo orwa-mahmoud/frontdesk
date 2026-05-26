@@ -11,7 +11,6 @@ from collections.abc import Sequence
 
 from openai import AsyncOpenAI
 
-from src.config.settings import get_settings
 from src.domain.shared.exceptions import InvalidOperationError
 
 
@@ -21,14 +20,13 @@ class OpenAIEmbedder:
     def __init__(
         self,
         *,
-        api_key: str | None = None,
-        model: str | None = None,
-        dimensions: int | None = None,
+        api_key: str,
+        model: str,
+        dimensions: int,
     ) -> None:
-        settings = get_settings()
-        self._api_key = api_key or settings.openai_api_key or ""
-        self._model = model or settings.default_embedding_model
-        self._dimensions = dimensions or settings.default_embedding_dimensions
+        self._api_key = api_key
+        self._model = model
+        self._dimensions = dimensions
         self._client: AsyncOpenAI | None = None
 
     def _get_client(self) -> AsyncOpenAI:
@@ -38,17 +36,28 @@ class OpenAIEmbedder:
             self._client = AsyncOpenAI(api_key=self._api_key)
         return self._client
 
+    async def close(self) -> None:
+        if self._client is not None:
+            await self._client.close()
+            self._client = None
+
+    _BATCH_SIZE = 512
+
     async def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         if not texts:
             return []
         client = self._get_client()
         cleaned = [t if t.strip() else " " for t in texts]
-        response = await client.embeddings.create(
-            model=self._model,
-            input=list(cleaned),
-            dimensions=self._dimensions,
-        )
-        return [d.embedding for d in response.data]
+        all_embeddings: list[list[float]] = []
+        for i in range(0, len(cleaned), self._BATCH_SIZE):
+            batch = cleaned[i : i + self._BATCH_SIZE]
+            response = await client.embeddings.create(
+                model=self._model,
+                input=list(batch),
+                dimensions=self._dimensions,
+            )
+            all_embeddings.extend(d.embedding for d in response.data)
+        return all_embeddings
 
     async def embed_query(self, text: str) -> list[float]:
         result = await self.embed_documents([text])

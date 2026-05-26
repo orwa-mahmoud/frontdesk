@@ -42,6 +42,7 @@ dist/
 .env.*.local
 *.env
 !.env.example
+!.env.docker.example
 
 # ── Testing / coverage / type cache ───────────────────────────────
 .pytest_cache/

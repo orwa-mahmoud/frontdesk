@@ -42,9 +42,8 @@ async def test_upload_markdown_then_list_then_delete(client: AsyncClient) -> Non
         headers=headers,
         files={"file": ("faq.md", md_content, "text/markdown")},
     )
-    # Embedding requires OPENAI_API_KEY. Skip if not available.
     if resp.status_code in {400, 500}:
-        pytest.skip("OPENAI_API_KEY not set or embedding failed — cannot test upload")
+        pytest.skip("Embedding API key not configured in tenant settings — cannot test upload")
     assert resp.status_code == 201
     doc = resp.json()
     assert doc["status"] == "ready"
