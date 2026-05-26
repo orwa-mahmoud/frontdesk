@@ -16,5 +16,5 @@ from src.domain.shared.exceptions import DomainError
 def domain_error_handler(_request: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.http_status,
-        content={"detail": str(exc) or exc.__class__.__name__},
+        content={"detail": str(exc) or "An error occurred"},
     )
