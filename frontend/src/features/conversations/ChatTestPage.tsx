@@ -60,7 +60,7 @@ export function ChatTestPage() {
 
       <Card withBorder radius="md" p={0} style={{ height: "60vh", display: "flex", flexDirection: "column" }}>
         <ScrollArea style={{ flex: 1 }} p="md">
-          <Stack gap="sm">
+          <Stack gap="sm" role="log" aria-live="polite">
             {messages.length === 0 && (
               <Text c="dimmed" ta="center" py="xl">
                 Send a message to test the agent pipeline.
@@ -103,7 +103,7 @@ export function ChatTestPage() {
               }
             }}
           />
-          <Button onClick={() => void send()} loading={sending} leftSection={<IconSend size={16} />}>
+          <Button onClick={() => void send()} loading={sending} disabled={sending} aria-label="Send message" leftSection={<IconSend size={16} />}>
             Send
           </Button>
         </Group>
