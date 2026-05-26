@@ -8,12 +8,12 @@ from src.application.auth.commands import RegisterOwner
 from src.application.auth.dtos import AuthResult
 from src.application.shared.unit_of_work import UnitOfWork
 from src.domain.auth.ports import PasswordHasher
+from src.domain.auth.ports import TokenServicePort as JwtService
 from src.domain.shared.exceptions import AlreadyExistsError, InvalidOperationError
 from src.domain.tenant_config.entities import TenantConfig
 from src.domain.tenants.entities import Tenant
 from src.domain.users.entities import User, UserTenant
 from src.domain.users.value_objects import UserTenantRole
-from src.infrastructure.auth.jwt_service import JwtService
 
 _SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _MIN_PASSWORD_LENGTH = 8
@@ -57,6 +57,8 @@ class RegisterOwnerUseCase:
 
         await self._uow.users.save(user)
         await self._uow.tenants.save(tenant)
+        self._uow.track(user)
+        self._uow.track(tenant)
         # Ensure FK targets exist before inserting the link row.
         await self._uow.flush()
 
@@ -66,10 +68,9 @@ class RegisterOwnerUseCase:
             role=UserTenantRole.OWNER,
         )
         await self._uow.user_tenants.save(link)
+        self._uow.track(link)
 
-        # Create default tenant config (owner updates LLM keys via settings later).
         config = TenantConfig.create_default(tenant_id=tenant.id)
-        config._is_new = True
         await self._uow.tenant_configs.save(config)
 
         token = self._jwt_service.issue_access_token(user_id=user.id, tenant_id=tenant.id)

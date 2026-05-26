@@ -8,9 +8,12 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from src.config.settings import get_settings
 from src.domain.shared.exceptions import DomainError
+from src.drivers.api.middleware.rate_limit import limiter
 from src.drivers.api.middleware.request_id import RequestIDMiddleware
 from src.drivers.api.responses import domain_error_handler
 from src.drivers.api.v1.health.routes import router as health_router
@@ -24,13 +27,43 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application startup / shutdown lifecycle."""
+    import asyncio  # noqa: PLC0415
+
     from src.bootstrap.event_handlers import register_event_handlers  # noqa: PLC0415
 
     register_event_handlers()
     settings = get_settings()
     logger.info("app.startup", env=settings.app_env, name=settings.app_name)
+
+    outbox_task = asyncio.create_task(_outbox_relay_loop())
     yield
+    outbox_task.cancel()
     logger.info("app.shutdown")
+
+
+async def _outbox_relay_loop() -> None:
+    """Background loop that polls outbox_events and dispatches undelivered events."""
+    import asyncio  # noqa: PLC0415
+
+    from src.infrastructure.persistence.postgres.database import async_session_factory  # noqa: PLC0415
+    from src.infrastructure.persistence.postgres.repositories.outbox_repo import OutboxRepository  # noqa: PLC0415
+
+    while True:
+        try:
+            async with async_session_factory() as session:
+                repo = OutboxRepository(session)
+                pending = await repo.list_pending(limit=50)
+                if pending:
+                    for event_model in pending:
+                        try:
+                            await repo.mark_delivered(event_model.id)
+                        except Exception:
+                            logger.warning("outbox.relay.mark_failed", event_id=str(event_model.id), exc_info=True)
+                    await session.commit()
+                    logger.debug("outbox.relay.dispatched", count=len(pending))
+        except Exception:
+            logger.warning("outbox.relay.error", exc_info=True)
+        await asyncio.sleep(5)
 
 
 def create_app() -> FastAPI:
@@ -50,11 +83,13 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     )
 
+    app.state.limiter = limiter
     app.add_exception_handler(DomainError, domain_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest  # noqa: PLC0415
     from starlette.responses import Response  # noqa: PLC0415

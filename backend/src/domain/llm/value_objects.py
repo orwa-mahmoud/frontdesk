@@ -47,7 +47,7 @@ class TokenUsage:
 
     @property
     def total(self) -> int:
-        return self.input_tokens + self.output_tokens + self.cache_read_tokens + self.cache_write_tokens
+        return self.input_tokens + self.output_tokens
 
 
 @dataclass(frozen=True, kw_only=True)

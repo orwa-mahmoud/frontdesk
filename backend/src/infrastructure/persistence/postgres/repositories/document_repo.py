@@ -35,9 +35,13 @@ class PostgresDocumentRepository:
         model = await self._session.get(DocumentModel, document_id)
         return self._to_entity(model) if model else None
 
-    async def list_for_tenant(self, tenant_id: UUID) -> list[Document]:
+    async def list_for_tenant(self, tenant_id: UUID, *, limit: int = 100, offset: int = 0) -> list[Document]:
         stmt = (
-            select(DocumentModel).where(DocumentModel.tenant_id == tenant_id).order_by(DocumentModel.created_at.desc())
+            select(DocumentModel)
+            .where(DocumentModel.tenant_id == tenant_id)
+            .order_by(DocumentModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
         result = await self._session.execute(stmt)
         return [self._to_entity(m) for m in result.scalars().all()]

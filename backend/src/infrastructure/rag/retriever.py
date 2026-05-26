@@ -3,11 +3,8 @@
 Step 1: pull top-N candidates from the HNSW index (cosine distance).
 Step 2: pull top-N from BM25 over the tsvector column.
 Step 3: combine ranks with RRF (k=60) — robust to scale differences.
-Step 4: take top-k.
-
-A real production system would add a cross-encoder reranker as a Step 5,
-but that's deferred to v2 (the contract is shaped for it: `RetrievedChunk`
-carries enough metadata to feed any reranker).
+Step 4: optional cross-encoder reranking via RerankerPort.
+Step 5: take top-k.
 """
 
 from __future__ import annotations
@@ -17,9 +14,10 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.rag.ports import EmbeddingPort
+from src.domain.rag.ports import EmbeddingPort, RerankerPort
 from src.domain.rag.value_objects import RetrievedChunk
 from src.infrastructure.persistence.postgres.models.chunk import ChunkModel
+from src.infrastructure.rag.reranker import PassThroughReranker
 
 _DEFAULT_CANDIDATE_POOL = 50
 _RRF_K = 60
@@ -28,9 +26,10 @@ _RRF_K = 60
 class HybridRetriever:
     """Implements `RetrieverPort`. Tenant-isolated at every query."""
 
-    def __init__(self, *, session: AsyncSession, embedder: EmbeddingPort) -> None:
+    def __init__(self, *, session: AsyncSession, embedder: EmbeddingPort, reranker: RerankerPort | None = None) -> None:
         self._session = session
         self._embedder = embedder
+        self._reranker: RerankerPort = reranker or PassThroughReranker()
 
     async def hybrid_retrieve(
         self,
@@ -39,19 +38,22 @@ class HybridRetriever:
         tenant_id: UUID,
         top_k: int = 8,
     ) -> list[RetrievedChunk]:
+        from src.infrastructure.metrics import RAG_RETRIEVALS_TOTAL  # noqa: PLC0415
+
         query = query.strip()
         if not query:
             return []
 
+        RAG_RETRIEVALS_TOTAL.inc()
         query_embedding = await self._embedder.embed_query(query)
         vector_hits = await self._vector_search(query_embedding, tenant_id, _DEFAULT_CANDIDATE_POOL)
         bm25_hits = await self._bm25_search(query, tenant_id, _DEFAULT_CANDIDATE_POOL)
 
-        fused = self._rrf_fuse(vector_hits, bm25_hits)[:top_k]
+        rerank_pool = top_k * 3
+        fused = self._rrf_fuse(vector_hits, bm25_hits)[:rerank_pool]
 
-        # Hydrate from whichever pool we found them in.
         by_id: dict[UUID, ChunkModel] = {m.id: m for m in vector_hits + bm25_hits}
-        return [
+        candidates = [
             RetrievedChunk(
                 chunk_id=cid,
                 document_id=by_id[cid].document_id,
@@ -63,6 +65,8 @@ class HybridRetriever:
             for cid, score in fused
             if cid in by_id
         ]
+
+        return await self._reranker.rerank(query, candidates, top_k=top_k)
 
     # ── Stage 1: vector (HNSW cosine) ─────────────────────────────
     async def _vector_search(

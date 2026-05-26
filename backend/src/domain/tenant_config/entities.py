@@ -1,8 +1,8 @@
 """TenantConfig aggregate — per-tenant LLM + channel credentials.
 
 Stores everything the gateway needs to build an LLM client and send
-replies through the right channel. API keys are stored as-is in v1;
-production should encrypt at rest (PropertyBot uses Fernet — add in v2).
+replies through the right channel. API keys are encrypted at rest via
+Fernet when ENCRYPTION_KEY is configured.
 
 One TenantConfig per Tenant. Created atomically during registration
 with safe defaults; the owner updates via the settings API.
@@ -25,7 +25,7 @@ class TenantConfig(BaseEntity):
     # ── LLM ────────────────────────────────────────────────────────
     llm_provider: LLMProvider
     llm_model: str
-    llm_api_key: str  # encrypt at rest in production
+    llm_api_key: str
     llm_max_tokens: int
     llm_temperature: float
 
@@ -39,6 +39,7 @@ class TenantConfig(BaseEntity):
     whatsapp_phone_number_id: str | None
     whatsapp_access_token: str | None
     whatsapp_verify_token: str | None
+    whatsapp_app_secret: str | None
 
     # ── Telegram Bot API ───────────────────────────────────────────
     telegram_bot_token: str | None
@@ -55,7 +56,7 @@ class TenantConfig(BaseEntity):
     @classmethod
     def create_default(cls, *, tenant_id: UUID) -> TenantConfig:
         now = datetime.now(UTC)
-        return cls(
+        config = cls(
             id=uuid4(),
             tenant_id=tenant_id,
             llm_provider=LLMProvider.OPENAI,
@@ -70,6 +71,7 @@ class TenantConfig(BaseEntity):
             whatsapp_phone_number_id=None,
             whatsapp_access_token=None,
             whatsapp_verify_token=None,
+            whatsapp_app_secret=None,
             telegram_bot_token=None,
             telegram_webhook_secret=None,
             bot_name="Front Desk Assistant",
@@ -78,7 +80,8 @@ class TenantConfig(BaseEntity):
             created_at=now,
             updated_at=now,
         )
-        # _is_new is set by the caller (register use case)
+        config._is_new = True
+        return config
 
     def update_llm(
         self,
@@ -125,6 +128,7 @@ class TenantConfig(BaseEntity):
         phone_number_id: str | None = None,
         access_token: str | None = None,
         verify_token: str | None = None,
+        app_secret: str | None = None,
     ) -> None:
         if phone_number_id is not None:
             self.whatsapp_phone_number_id = phone_number_id
@@ -132,6 +136,8 @@ class TenantConfig(BaseEntity):
             self.whatsapp_access_token = access_token
         if verify_token is not None:
             self.whatsapp_verify_token = verify_token
+        if app_secret is not None:
+            self.whatsapp_app_secret = app_secret
         self.updated_at = datetime.now(UTC)
 
     def update_telegram(

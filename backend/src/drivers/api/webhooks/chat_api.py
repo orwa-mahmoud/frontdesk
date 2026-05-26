@@ -7,7 +7,7 @@ without setting up WhatsApp or Telegram.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from src.ai.gateway import chat_with_agent
@@ -15,6 +15,7 @@ from src.ai.types import ChatInput
 from src.domain.conversations.value_objects import ConversationChannel
 from src.domain.shared.exceptions import AuthenticationError
 from src.drivers.api.dependencies import CurrentUser, UnitOfWorkDep
+from src.drivers.api.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -31,7 +32,8 @@ class ChatResponse(BaseModel):
 
 
 @router.post("")
-async def chat(req: ChatRequest, current_user: CurrentUser, uow: UnitOfWorkDep) -> ChatResponse:
+@limiter.limit("10/minute")
+async def chat(request: Request, req: ChatRequest, current_user: CurrentUser, uow: UnitOfWorkDep) -> ChatResponse:
     """Send a test message through the full agent pipeline."""
     links = await uow.user_tenants.list_for_user(current_user.id)
     if not links:

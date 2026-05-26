@@ -2,24 +2,44 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
+from pydantic import BaseModel, Field
 
 from src.application.auth.commands import AuthenticateUser, RegisterOwner
+from src.application.auth.use_cases.change_password import ChangePassword, ChangePasswordUseCase
 from src.application.auth.use_cases.refresh_token import RefreshTokenUseCase
 from src.bootstrap.container import (
     authenticate_user_use_case,
     get_jwt_service,
+    get_password_hasher,
     get_user_by_id_use_case,
     register_owner_use_case,
 )
+from src.config.settings import get_settings
 from src.drivers.api.dependencies import CurrentUser, UnitOfWorkDep
 from src.drivers.api.v1.auth.schemas import LoginRequest, MeResponse, RegisterRequest, TenantSummary, TokenResponse
+
+_COOKIE_NAME = "frontdesk_token"
+
+
+def _set_auth_cookie(response: Response, token: str) -> None:
+    is_prod = get_settings().app_env == "production"
+    response.set_cookie(
+        key=_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=is_prod,
+        samesite="lax",
+        max_age=get_settings().jwt_access_token_expire_minutes * 60,
+        path="/",
+    )
+
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(req: RegisterRequest, uow: UnitOfWorkDep) -> TokenResponse:
+async def register(req: RegisterRequest, uow: UnitOfWorkDep, response: Response) -> TokenResponse:
     cmd = RegisterOwner(
         email=req.email,
         password=req.password,
@@ -28,13 +48,15 @@ async def register(req: RegisterRequest, uow: UnitOfWorkDep) -> TokenResponse:
         tenant_slug=req.tenant_slug,
     )
     result = await register_owner_use_case(uow).execute(cmd)
+    _set_auth_cookie(response, result.access_token)
     return TokenResponse(access_token=result.access_token, user_id=result.user_id, tenant_id=result.tenant_id)
 
 
 @router.post("/login")
-async def login(req: LoginRequest, uow: UnitOfWorkDep) -> TokenResponse:
+async def login(req: LoginRequest, uow: UnitOfWorkDep, response: Response) -> TokenResponse:
     cmd = AuthenticateUser(email=req.email, password=req.password)
     result = await authenticate_user_use_case(uow).execute(cmd)
+    _set_auth_cookie(response, result.access_token)
     return TokenResponse(access_token=result.access_token, user_id=result.user_id, tenant_id=result.tenant_id)
 
 
@@ -51,7 +73,25 @@ async def me(current_user: CurrentUser, uow: UnitOfWorkDep) -> MeResponse:
 
 
 @router.post("/refresh")
-async def refresh(current_user: CurrentUser, uow: UnitOfWorkDep) -> TokenResponse:
+async def refresh(current_user: CurrentUser, uow: UnitOfWorkDep, response: Response) -> TokenResponse:
     uc = RefreshTokenUseCase(uow=uow, jwt_service=get_jwt_service())
     result = await uc.execute(current_user.id)
+    _set_auth_cookie(response, result.access_token)
     return TokenResponse(access_token=result.access_token, user_id=result.user_id, tenant_id=result.tenant_id)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(response: Response) -> None:
+    response.delete_cookie(key=_COOKIE_NAME, path="/")
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(req: ChangePasswordRequest, current_user: CurrentUser, uow: UnitOfWorkDep) -> None:
+    await ChangePasswordUseCase(uow=uow, password_hasher=get_password_hasher()).execute(
+        ChangePassword(user_id=current_user.id, old_password=req.old_password, new_password=req.new_password)
+    )

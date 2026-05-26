@@ -30,14 +30,12 @@ Hexagonal DDD + CQRS. The AI agent is a cross-cutting orchestration layer that c
 |  llm/             LangChain multi-provider LLM client     |
 |  rag/             Chunker, Embedder, Hybrid Retriever     |
 |  auth/            JWT, bcrypt password hashing            |
-|  notifications/   Channel-agnostic notification routing   |
 +-----------------------------------------------------------+
 
 +-----------------------------------------------------------+
 |            AI (Cross-cutting Orchestration)                 |
 |                                                           |
 |  ai/gateway.py        Single entry point: chat_with_agent |
-|  ai/agents/agent.py   LLM -> tool -> LLM loop            |
 |  ai/context/          History, memory, prompts, checkpoint|
 |  ai/tools/            search_documents, escalate_question,|
 |                       save_key_fact, remove_key_fact       |
@@ -70,15 +68,13 @@ All outbound dependencies (DB, notifications, LLM, embeddings) have a port inter
 
 | Concept | Location |
 | ------- | -------- |
-| Base classes | `domain/shared/` (entities.py, events.py, value_objects.py) |
+| Base classes | `domain/shared/` (entities.py, events.py, exceptions.py, utils.py) |
 | Domain exceptions | `domain/shared/exceptions.py` (DomainError hierarchy -- shared across all contexts) |
 | Domain entity | `domain/{context}/entities.py` -- rich entities with behavior, factories, and events |
 | ORM models | `infrastructure/persistence/postgres/models/` (one file per model) |
 | Value object | `domain/*/value_objects.py` |
 | Repository (interface) | `domain/*/repositories.py` (ContactRepository, ConversationRepository, etc.) |
-| Gateway port (interface) | `domain/*/ports.py` (LLMClientPort, EmbeddingPort, RetrieverPort, NotificationPort) |
 | Repository (impl) | `infrastructure/persistence/postgres/repositories/*_repo.py` |
-| Domain operations | `domain/*/operations.py` -- pure helpers that delegate to entity methods |
 | Event | `domain/*/events.py` |
 | Command | `application/{context}/commands.py` -- frozen dataclasses with typed fields |
 | Query | `application/{context}/queries.py` -- frozen dataclasses with typed fields |
@@ -109,7 +105,6 @@ All outbound dependencies (DB, notifications, LLM, embeddings) have a port inter
 | `llm` | LLM domain port (`LLMClientPort`) + framework-agnostic value objects (LLMMessage, LLMCallResult) |
 | `rag` | RAG domain ports (ChunkerPort, EmbeddingPort, RetrieverPort) + value objects (TextChunk, RetrievedChunk) |
 | `telegram` | Telegram phone lookup table (telegram_user_id -> phone mapping for contact resolution) |
-| `notifications` | Notification routing port + routing adapter (resolve best delivery channel for a recipient) |
 
 **Naming:** Context folder names are plural where the domain concept is plural (`tenants`, `users`, `contacts`, `conversations`, `documents`, `questions`). Singular for domain capabilities (`auth`, `llm`, `rag`, `telegram`).
 
@@ -122,8 +117,7 @@ src/
 |   |   +-- entities.py           # BaseEntity: identity, equality, pending events, is_new
 |   |   +-- events.py             # DomainEvent base (event_id, occurred_at via kw_only)
 |   |   +-- exceptions.py         # DomainError -> EntityNotFoundError, AlreadyExistsError, etc.
-|   |   +-- value_objects.py      # DateRange, SortOrder
-|   |   +-- ports.py              # NotificationPort (cross-cutting)
+|   |   +-- utils.py              # is_valid_slug
 |   |   +-- channel_result.py     # ChannelSendResult value object (sent/failed + metadata)
 |   |   +-- media.py              # Pure text-parsing: extract_media() from LLM responses
 |   |   +-- utils.py              # Pure domain utilities
@@ -132,7 +126,6 @@ src/
 |   +-- tenants/
 |   |   +-- entities.py           # Tenant aggregate (create, suspend, activate, rename)
 |   |   +-- events.py             # TenantCreated, TenantSuspended, TenantActivated
-|   |   +-- operations.py         # Domain helpers
 |   |   +-- repositories.py       # TenantRepository port
 |   |   +-- value_objects.py      # TenantStatus enum
 |   +-- tenant_config/
@@ -187,9 +180,6 @@ src/
 +-- application/
 |   +-- shared/
 |   |   +-- unit_of_work.py       # UnitOfWork class -- single session, all repos
-|   |   +-- event_collector.py    # Event collection utilities
-|   |   +-- outbox_publisher.py   # Event outbox publishing
-|   |   +-- pagination.py         # Shared pagination helpers
 |   +-- auth/
 |   |   +-- commands.py           # AuthenticateUser, RegisterOwner, ChangePassword, RefreshToken
 |   |   +-- dtos.py               # AuthResultDTO, UserDTO
@@ -328,7 +318,6 @@ src/
 |
 +-- config/
 |   +-- settings.py               # Pydantic-settings (env-backed)
-|   +-- logging.py                # Structured logging config
 |
 tests/
 +-- unit/                          # domain, application, ai -- no IO; mock ports/repos
@@ -342,8 +331,6 @@ tests/
 | `entities.py` | Rich domain entities with behavior methods, factory `create()` (or domain-verb like `submit()`, `upload()`, `start()`), invariant guards, and event emission |
 | `value_objects.py` | Immutable types and enums (ConversationRole, QuestionStatus, DocumentMimeType, TenantStatus) |
 | `repositories.py` | Persistence ports -- `save(entity)` for writes, `get_by_id()` / `get_by_thread_id()` for reads |
-| `ports.py` | Gateway ports (LLMClientPort, EmbeddingPort, RetrieverPort, NotificationPort, PasswordHasher) |
-| `operations.py` | (optional) Domain helpers -- pure functions that delegate to entity methods; no repo calls |
 | `events.py` | Domain events (frozen dataclasses inheriting `DomainEvent`) |
 
 **Domain cannot perform IO** (DB, network, filesystem, LLM calls). Keep domain pure and deterministic -- sync/async is allowed; IO is not.

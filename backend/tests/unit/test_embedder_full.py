@@ -22,7 +22,7 @@ async def test_embed_documents_calls_api(mock_get_client: MagicMock) -> None:
     mock_client.embeddings.create = AsyncMock(return_value=mock_response)
     mock_get_client.return_value = mock_client
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678")
+    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
 
     result = await embedder.embed_documents(["Hello", "World"])
     assert result == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
@@ -41,7 +41,7 @@ async def test_embed_documents_replaces_blank_with_space(mock_get_client: MagicM
     mock_client.embeddings.create = AsyncMock(return_value=mock_response)
     mock_get_client.return_value = mock_client
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678")
+    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
 
     await embedder.embed_documents(["   "])  # blank text
     call_args = mock_client.embeddings.create.call_args
@@ -54,7 +54,7 @@ async def test_embed_documents_replaces_blank_with_space(mock_get_client: MagicM
 async def test_embed_query_delegates_to_embed_documents(mock_embed_docs: AsyncMock) -> None:
     mock_embed_docs.return_value = [[0.1, 0.2]]
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678")
+    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
     result = await embedder.embed_query("hello")
     assert result == [0.1, 0.2]
     mock_embed_docs.assert_called_once_with(["hello"])
@@ -65,6 +65,6 @@ async def test_embed_query_delegates_to_embed_documents(mock_embed_docs: AsyncMo
 async def test_embed_query_returns_empty_when_no_results(mock_embed_docs: AsyncMock) -> None:
     mock_embed_docs.return_value = []
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678")
+    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
     result = await embedder.embed_query("hello")
     assert result == []
