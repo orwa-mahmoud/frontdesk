@@ -99,8 +99,7 @@ async def chat_with_agent(inp: ChatInput, *, uow: UnitOfWork) -> ChatResult:
     # ── 3. Build prompt (with key facts if available) ───────────
     from src.ai.context.memory import load_key_facts_context  # noqa: PLC0415
 
-    system_msg = build_asker_system_prompt()
-    facts_context = ""
+    system_msg, facts_context = build_asker_system_prompt(), ""
     if contact_id is not None:
         facts_context = await load_key_facts_context(
             tenant_id=inp.tenant_id,
@@ -153,6 +152,7 @@ async def chat_with_agent(inp: ChatInput, *, uow: UnitOfWork) -> ChatResult:
             conversation_id=conversation_id,
             contact_id=contact_id,
         )
+        _record_agent_metrics(inp.channel.value, result)
         logger.info(
             "gateway.agent_done",
             thread_id=thread_id,
@@ -252,6 +252,17 @@ async def _save_agent_messages(
             request_id=request_id,
         )
     )
+
+
+def _record_agent_metrics(channel: str, result: AgentLoopResult) -> None:
+    from src.infrastructure.metrics import (  # noqa: PLC0415
+        AGENT_INVOCATIONS_TOTAL,
+        AGENT_TOOL_CALLS_TOTAL,
+    )
+
+    AGENT_INVOCATIONS_TOTAL.labels(channel=channel).inc()
+    for tc in result.tool_calls:
+        AGENT_TOOL_CALLS_TOTAL.labels(tool_name=tc.tool_name).inc()
 
 
 _llm_factory: TenantLLMClientFactory | None = None

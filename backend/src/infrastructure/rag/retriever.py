@@ -38,10 +38,13 @@ class HybridRetriever:
         tenant_id: UUID,
         top_k: int = 8,
     ) -> list[RetrievedChunk]:
+        from src.infrastructure.metrics import RAG_RETRIEVALS_TOTAL  # noqa: PLC0415
+
         query = query.strip()
         if not query:
             return []
 
+        RAG_RETRIEVALS_TOTAL.inc()
         query_embedding = await self._embedder.embed_query(query)
         vector_hits = await self._vector_search(query_embedding, tenant_id, _DEFAULT_CANDIDATE_POOL)
         bm25_hits = await self._bm25_search(query, tenant_id, _DEFAULT_CANDIDATE_POOL)
