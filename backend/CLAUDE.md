@@ -53,15 +53,14 @@ Architecture and reference docs:
 
 | Concept | Location |
 | ------- | -------- |
-| Base classes | `domain/shared/` (entities.py, events.py, value_objects.py) |
+| Base classes | `domain/shared/` (entities.py, events.py, exceptions.py, utils.py) |
 | Domain exceptions | `domain/shared/exceptions.py` (shared across all contexts) |
 | Domain entity | `domain/{context}/entities.py` -- rich, with behavior + factories + events |
-| Value objects | `domain/{context}/value_objects.py` |
+| Value objects | `domain/{context}/value_objects.py` (where applicable) |
 | Repository port | `domain/{context}/repositories.py` |
 | Gateway port | `domain/{context}/ports.py` (LLMClientPort, EmbeddingPort, RetrieverPort, NotificationPort) |
 | ORM models | `infrastructure/persistence/postgres/models/` (one file per model) |
 | Repository impl | `infrastructure/persistence/postgres/repositories/*_repo.py` |
-| Domain operations | `domain/{context}/operations.py` -- pure helpers delegating to entity methods |
 | Command / Query | `application/{context}/commands.py` / `queries.py` -- frozen dataclasses, typed fields |
 | Use case | `application/{context}/use_cases/` (one file per use case) |
 | DTOs | `application/{context}/dtos.py` |
@@ -98,7 +97,7 @@ Architecture and reference docs:
 
 ```text
 src/
-+-- domain/{context}/       # entities.py, repositories.py, ports.py, value_objects.py, events.py
++-- domain/{context}/       # entities.py, repositories.py, ports.py, events.py
 |   +-- shared/             # BaseEntity, DomainEvent, DomainError hierarchy
 +-- application/{context}/  # commands.py, queries.py, dtos.py, use_cases/
 |   +-- shared/             # UnitOfWork, event collection, pagination
@@ -109,7 +108,7 @@ src/
 |   +-- persistence/postgres/models/ + repositories/
 |   +-- channels/, llm/, rag/, auth/, metrics/, notifications/
 +-- bootstrap/              # container.py, events.py, event_handlers.py
-+-- config/                 # settings.py, logging.py
++-- config/                 # settings.py
 
 tests/
 +-- unit/                   # domain, application, ai -- no IO; mock ports/repos
