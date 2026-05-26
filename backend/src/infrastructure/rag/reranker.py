@@ -14,5 +14,5 @@ from src.domain.rag.value_objects import RetrievedChunk
 class PassThroughReranker:
     """No-op reranker — returns chunks unchanged."""
 
-    async def rerank(self, query: str, chunks: list[RetrievedChunk], *, top_k: int = 8) -> list[RetrievedChunk]:
+    async def rerank(self, _query: str, chunks: list[RetrievedChunk], *, top_k: int = 8) -> list[RetrievedChunk]:
         return chunks[:top_k]
