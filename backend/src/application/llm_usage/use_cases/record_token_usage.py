@@ -11,7 +11,7 @@ class RecordTokenUsageUseCase:
     def __init__(self, *, uow: UnitOfWork) -> None:
         self._uow = uow
 
-    async def execute(self, cmd: RecordTokenUsage) -> TokenUsage:
+    async def execute(self, cmd: RecordTokenUsage) -> None:
         usage = TokenUsage.record(
             tenant_id=cmd.tenant_id,
             provider=cmd.provider,
@@ -25,4 +25,3 @@ class RecordTokenUsageUseCase:
             channel=cmd.channel,
         )
         await self._uow.token_usages.save(usage)
-        return usage
