@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 from src.domain.notifications.entities import NotificationFailure
 
 
-class NotificationFailureRepository(ABC):
+class NotificationFailureRepository(Protocol):
     """Port for persisting notification failures."""
 
-    @abstractmethod
     async def save(self, failure: NotificationFailure) -> None: ...
