@@ -300,6 +300,16 @@ def _get_llm_factory() -> TenantLLMClientFactory:
     return _Singletons.llm_factory
 
 
+def invalidate_tenant_llm_client(tenant_id: uuid.UUID) -> None:
+    """Drop a tenant's cached LLM client so the next chat picks up new LLM config.
+
+    Called from the settings route after an LLM-config update; without this the
+    cached client (provider/model/api_key) would keep serving for up to the
+    factory TTL (1h) and the owner's change wouldn't take effect.
+    """
+    _get_llm_factory().invalidate(tenant_id)
+
+
 def _get_redis_client() -> object | None:
     if _Singletons.redis_client is not None:
         return _Singletons.redis_client

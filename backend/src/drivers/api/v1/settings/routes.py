@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
+from src.ai.gateway import invalidate_tenant_llm_client
 from src.domain.shared.exceptions import AuthenticationError, AuthorizationError, EntityNotFoundError
 from src.domain.tenant_config.entities import TenantConfig
 from src.domain.users.value_objects import UserTenantRole
@@ -72,7 +73,7 @@ async def update_llm(
     current_user: CurrentUser,
     uow: UnitOfWorkDep,
 ) -> TenantConfigResponse:
-    _, config = await _resolve_config(current_user, uow, require_owner=True)
+    tenant_id, config = await _resolve_config(current_user, uow, require_owner=True)
     config.update_llm(
         provider=req.provider,
         model=req.model,
@@ -81,6 +82,8 @@ async def update_llm(
         temperature=req.temperature,
     )
     await uow.tenant_configs.save(config)
+    # Drop the cached LLM client so the next chat uses the updated provider/model/key.
+    invalidate_tenant_llm_client(tenant_id)
     return _to_response(config)
 
 
