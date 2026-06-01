@@ -24,6 +24,48 @@
     "cancel": "إلغاء",
     "save": "حفظ"
   },
+  "channels": {
+    "whatsapp": "واتساب",
+    "telegram": "تيليجرام",
+    "email": "البريد الإلكتروني",
+    "web": "الويب",
+    "owner_dashboard": "المالك",
+    "api": "واجهة برمجية"
+  },
+  "conversations": {
+    "title": "المحادثات",
+    "subtitle": "جميع المحادثات بين السائلين والذكاء الاصطناعي.",
+    "searchPlaceholder": "ابحث في المحادثات",
+    "emptyTitle": "لا توجد محادثات بعد.",
+    "emptyDesc": "بمجرد أن يراسل السائلون، ستظهر المحادثات هنا.",
+    "colThread": "المحادثة",
+    "colChannel": "القناة",
+    "colLastMessage": "آخر رسالة",
+    "colCreated": "تاريخ الإنشاء",
+    "statMessagesToday": "رسائل اليوم",
+    "statActive": "المحادثات النشطة",
+    "statEscalated": "المُصعّدة اليوم"
+  },
+  "documents": {
+    "title": "قاعدة المعرفة",
+    "subtitle": "ارفع ملفات PDF أو Markdown أو DOCX. يعتمد الذكاء الاصطناعي على هذه المستندات في إجاباته عبر الاسترجاع الهجين (متجهات + BM25) فوق pgvector.",
+    "searchPlaceholder": "ابحث في الملفات",
+    "upload": "رفع ملف",
+    "uploaded": "تم استيعاب المستند.",
+    "uploadFailed": "فشل الرفع. تحقق من نوع الملف (PDF أو DOCX أو Markdown أو نص عادي).",
+    "deleted": "تم حذف المستند.",
+    "deleteFailed": "تعذّر حذف المستند.",
+    "confirmDeleteTitle": "حذف المستند",
+    "confirmDelete": "هل أنت متأكد من حذف هذا المستند؟",
+    "emptyTitle": "لا توجد مستندات بعد.",
+    "emptyDesc": "ارفع ملفًا للبدء — تُضمَّن الأجزاء باستخدام text-embedding-3-large.",
+    "colFile": "الملف",
+    "colStatus": "الحالة",
+    "colChunks": "الأجزاء",
+    "colSize": "الحجم",
+    "colUploaded": "تاريخ الرفع",
+    "filterStatus": "الحالة"
+  },
   "table": {
     "loadMore": "تحميل المزيد",
     "rangeOfTotal": "{{from}}–{{to}} من {{total}}",

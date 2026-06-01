@@ -24,6 +24,48 @@
     "cancel": "Cancel",
     "save": "Save"
   },
+  "channels": {
+    "whatsapp": "WhatsApp",
+    "telegram": "Telegram",
+    "email": "Email",
+    "web": "Web",
+    "owner_dashboard": "Owner",
+    "api": "API"
+  },
+  "conversations": {
+    "title": "Conversations",
+    "subtitle": "All threads between askers and the AI.",
+    "searchPlaceholder": "Search threads",
+    "emptyTitle": "No conversations yet.",
+    "emptyDesc": "Once askers message, threads appear here.",
+    "colThread": "Thread",
+    "colChannel": "Channel",
+    "colLastMessage": "Last message",
+    "colCreated": "Created",
+    "statMessagesToday": "Messages today",
+    "statActive": "Active conversations",
+    "statEscalated": "Escalated today"
+  },
+  "documents": {
+    "title": "Knowledge base",
+    "subtitle": "Upload PDFs, Markdown, or DOCX. The AI grounds its answers in these documents using hybrid (vector + BM25) retrieval over pgvector.",
+    "searchPlaceholder": "Search files",
+    "upload": "Upload file",
+    "uploaded": "Document ingested.",
+    "uploadFailed": "Upload failed. Check file type (PDF, DOCX, Markdown, plain text).",
+    "deleted": "Document removed.",
+    "deleteFailed": "Failed to delete document.",
+    "confirmDeleteTitle": "Delete document",
+    "confirmDelete": "Are you sure you want to delete this document?",
+    "emptyTitle": "No documents yet.",
+    "emptyDesc": "Upload a file to get started — chunks are embedded with text-embedding-3-large.",
+    "colFile": "File",
+    "colStatus": "Status",
+    "colChunks": "Chunks",
+    "colSize": "Size",
+    "colUploaded": "Uploaded",
+    "filterStatus": "Status"
+  },
   "table": {
     "loadMore": "Load more",
     "rangeOfTotal": "{{from}}–{{to}} of {{total}}",
