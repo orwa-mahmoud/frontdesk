@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -164,6 +164,48 @@ describe("ConversationsPage", () => {
     await waitFor(() => {
       expect(screen.getByText(`${longId.slice(0, 40)}...`)).toBeInTheDocument();
     });
+  });
+
+  it("opens a transcript drawer and shows the conversation messages", async () => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url.includes("daily-summary")) {
+        return {
+          data: { date: "2026-01-01", total_messages: 0, active_conversations: 0, questions_escalated: 0 },
+        };
+      }
+      if (url.includes("/messages")) {
+        return {
+          data: [
+            { id: "m1", role: "user", content: "Do you deliver?", created_at: "2026-01-01T10:00:00Z" },
+            {
+              id: "m2",
+              role: "assistant",
+              content: "Yes, we deliver daily.",
+              created_at: "2026-01-01T10:00:05Z",
+            },
+          ],
+        };
+      }
+      return {
+        data: [
+          {
+            id: "c1",
+            thread_id: "thread-abc",
+            channel: "whatsapp",
+            last_message_at: "2026-01-01T10:00:00Z",
+            created_at: "2026-01-01T09:00:00Z",
+          },
+        ],
+      };
+    });
+    render(<ConversationsPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => expect(screen.getByText("thread-abc")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "View transcript" }));
+
+    await waitFor(() => expect(screen.getByText("Yes, we deliver daily.")).toBeInTheDocument());
+    expect(screen.getByText("Do you deliver?")).toBeInTheDocument();
+    expect(screen.getByText("Visitor")).toBeInTheDocument();
   });
 
   it("shows raw channel name when not in lookup map", async () => {

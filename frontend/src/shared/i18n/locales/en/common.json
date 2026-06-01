@@ -92,7 +92,13 @@
     "colCreated": "Created",
     "statMessagesToday": "Messages today",
     "statActive": "Active conversations",
-    "statEscalated": "Escalated today"
+    "statEscalated": "Escalated today",
+    "view": "View transcript",
+    "transcript": "Conversation transcript",
+    "noMessages": "No messages in this conversation yet.",
+    "loadMessagesError": "Could not load the transcript.",
+    "visitor": "Visitor",
+    "assistant": "AI"
   },
   "documents": {
     "title": "Knowledge base",
