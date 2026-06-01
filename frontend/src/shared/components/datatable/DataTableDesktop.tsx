@@ -20,6 +20,19 @@ export interface DataTableDesktopProps<TRow> {
   readonly onRunAction: (action: RowAction<TRow>, row: TRow) => void;
 }
 
+function ariaSortFor(
+  sorted: boolean,
+  dir: SortDirection | undefined,
+): "ascending" | "descending" | undefined {
+  if (!sorted) return undefined;
+  return dir === "desc" ? "descending" : "ascending";
+}
+
+function SortIcon({ sorted, dir }: Readonly<{ sorted: boolean; dir: SortDirection | undefined }>) {
+  if (!sorted) return <IconSelector size={14} opacity={0.5} />;
+  return dir === "desc" ? <IconChevronDown size={14} /> : <IconChevronUp size={14} />;
+}
+
 export function DataTableDesktop<TRow>({
   columns,
   rows,
@@ -45,7 +58,7 @@ export function DataTableDesktop<TRow>({
           <Table.Tr>
             {visibleColumns.map((col) => {
               const sorted = sortBy === col.key;
-              const ariaSort = sorted ? (sortDir === "desc" ? "descending" : "ascending") : undefined;
+              const ariaSort = ariaSortFor(sorted, sortDir);
               return (
                 <Table.Th
                   key={col.key}
@@ -60,15 +73,7 @@ export function DataTableDesktop<TRow>({
                       <Text span size="sm" fw={600}>
                         {col.header}
                       </Text>
-                      {sorted ? (
-                        sortDir === "desc" ? (
-                          <IconChevronDown size={14} />
-                        ) : (
-                          <IconChevronUp size={14} />
-                        )
-                      ) : (
-                        <IconSelector size={14} opacity={0.5} />
-                      )}
+                      <SortIcon sorted={sorted} dir={sortDir} />
                     </UnstyledButton>
                   ) : (
                     col.header

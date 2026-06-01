@@ -36,7 +36,9 @@ export function useMutationWithNotification<TData = unknown, TError = Error, TVa
     onSuccess: (data, variables) => {
       if (successMessage) notifications.show({ color: "teal", message: successMessage });
       if (invalidateKeys) {
-        for (const queryKey of invalidateKeys) void queryClient.invalidateQueries({ queryKey });
+        for (const queryKey of invalidateKeys) {
+          queryClient.invalidateQueries({ queryKey }).catch(() => undefined);
+        }
       }
       onSuccess?.(data, variables);
     },
