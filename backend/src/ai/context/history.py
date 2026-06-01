@@ -7,7 +7,7 @@ went quiet for more than 30 minutes (PropertyBot's pattern, generalized).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from src.application.conversations.dtos import ThreadMessageDTO
 from src.application.conversations.queries import LoadThreadHistory
@@ -59,14 +59,14 @@ def _build_messages(dtos: list[ThreadMessageDTO]) -> list[LLMMessage]:
 
 
 def _inject_staleness_hint(messages: list[LLMMessage], dtos: list[ThreadMessageDTO]) -> None:
-    last_ts = None
-    for dto in reversed(dtos):
-        if dto.created_at:
-            last_ts = dto.created_at
-            break
-    if not last_ts:
+    # Measure how long the thread was quiet *before* the current message: the gap
+    # between the two most recent messages. The inbound message is already
+    # persisted by the time history loads, so it is the newest dto — comparing it
+    # against `now` would always be ~0 and this hint would never fire.
+    timestamps = [dto.created_at for dto in reversed(dtos) if dto.created_at]
+    if len(timestamps) < 2:
         return
-    gap = datetime.now(UTC) - last_ts
+    gap = timestamps[0] - timestamps[1]
     if gap < STALE_THRESHOLD:
         return
     hint = _format_gap(gap)
