@@ -45,4 +45,12 @@ async def run_search_documents(
         return []
     use_case = RetrieveForQueryUseCase(retriever=retriever)
     chunks = await use_case.execute(RetrieveForQuery(tenant_id=tenant_id, query=query_text, top_k=8))
-    return [{"content": c.content, "score": round(c.score, 4), "chunk_id": str(c.chunk_id)} for c in chunks]
+    return [
+        {
+            "content": c.content,
+            "score": round(c.score, 4),
+            "chunk_id": str(c.chunk_id),
+            "document_id": str(c.document_id),
+        }
+        for c in chunks
+    ]

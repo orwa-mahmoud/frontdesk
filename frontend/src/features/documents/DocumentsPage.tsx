@@ -1,9 +1,10 @@
 import { Badge, Box, Button, FileButton, Group, Stack, Text, Title } from "@mantine/core";
-import { IconCircleCheck, IconFileText, IconTrash, IconUpload } from "@tabler/icons-react";
+import { IconCircleCheck, IconFileText, IconMessageCircle, IconTrash, IconUpload } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { api } from "@core/api/client";
 import {
@@ -184,16 +185,27 @@ export function DocumentsPage() {
         tableLabel={t("documents.title")}
         searchPlaceholder={t("documents.searchPlaceholder")}
         toolbar={
-          <FileButton
-            onChange={(file) => file && uploadMutation.mutate(file)}
-            accept=".pdf,.md,.markdown,.txt,.docx"
-          >
-            {(props) => (
-              <Button {...props} leftSection={<IconUpload size={18} />} loading={uploadMutation.isPending}>
-                {t("documents.upload")}
-              </Button>
-            )}
-          </FileButton>
+          <Group gap="sm">
+            <Button
+              component={Link}
+              to="/chat"
+              variant="light"
+              color="coral"
+              leftSection={<IconMessageCircle size={18} />}
+            >
+              {t("documents.testInChat")}
+            </Button>
+            <FileButton
+              onChange={(file) => file && uploadMutation.mutate(file)}
+              accept=".pdf,.md,.markdown,.txt,.docx"
+            >
+              {(props) => (
+                <Button {...props} leftSection={<IconUpload size={18} />} loading={uploadMutation.isPending}>
+                  {t("documents.upload")}
+                </Button>
+              )}
+            </FileButton>
+          </Group>
         }
         emptyState={
           <EmptyState

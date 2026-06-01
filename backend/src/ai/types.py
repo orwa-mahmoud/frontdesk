@@ -23,6 +23,19 @@ class ChatInput:
 
 
 @dataclass(kw_only=True)
+class ChatSource:
+    """A knowledge-base chunk the agent retrieved to ground its answer.
+
+    Surfaced to the dashboard chat so an owner can see *which* of their
+    documents the AI used (filename is resolved client-side from document_id).
+    """
+
+    document_id: str
+    snippet: str
+    score: float
+
+
+@dataclass(kw_only=True)
 class ChatResult:
     """What the gateway returns after processing."""
 
@@ -30,6 +43,7 @@ class ChatResult:
     thread_id: str
     escalated: bool = False  # true if a Question was submitted
     request_id: str = ""
+    sources: list[ChatSource] = field(default_factory=list)
 
 
 @dataclass(frozen=True, kw_only=True)
