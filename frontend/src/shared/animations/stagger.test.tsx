@@ -59,4 +59,25 @@ describe("useStaggerIn", () => {
     });
     expect(() => render(<Staggered />)).not.toThrow();
   });
+
+  it("treats a missing matchMedia as reduced motion (non-DOM envs)", () => {
+    // Simulate an environment without matchMedia (e.g. SSR / older jsdom).
+    Object.defineProperty(globalThis, "matchMedia", { writable: true, value: undefined });
+    const spy = vi.spyOn(gsap, "from").mockReturnValue({} as ReturnType<typeof gsap.from>);
+    render(<Staggered />);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("no-ops when the scope ref is never attached", () => {
+    setMatchMedia(false);
+    const spy = vi.spyOn(gsap, "from").mockReturnValue({} as ReturnType<typeof gsap.from>);
+    function Detached() {
+      const ref = useRef<HTMLDivElement>(null);
+      useStaggerIn(ref, ".item", []);
+      // ref is intentionally not attached to any element → ref.current stays null
+      return <div />;
+    }
+    render(<Detached />);
+    expect(spy).not.toHaveBeenCalled();
+  });
 });
