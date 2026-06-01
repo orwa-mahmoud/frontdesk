@@ -9,6 +9,8 @@ import pytest
 from src.domain.shared.exceptions import InvalidOperationError
 from src.infrastructure.rag.embedder import OpenAIEmbedder
 
+_TEST_KEY = "sk-test-12345678"  # fake credential for tests only
+
 
 @pytest.mark.asyncio
 @patch.object(OpenAIEmbedder, "_get_client")
@@ -25,7 +27,7 @@ async def test_embed_documents_calls_api(mock_get_client: MagicMock) -> None:
     mock_client.embeddings.create = AsyncMock(return_value=mock_response)
     mock_get_client.return_value = mock_client
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
+    embedder = OpenAIEmbedder(api_key=_TEST_KEY, model="text-embedding-3-large", dimensions=1536)
 
     result = await embedder.embed_documents(["Hello", "World"])
     assert result == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
@@ -44,9 +46,40 @@ async def test_embed_documents_orders_by_index(mock_get_client: MagicMock) -> No
     mock_client.embeddings.create = AsyncMock(return_value=mock_response)
     mock_get_client.return_value = mock_client
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
+    embedder = OpenAIEmbedder(api_key=_TEST_KEY, model="text-embedding-3-large", dimensions=1536)
     result = await embedder.embed_documents(["a", "b"])
     assert result == [[0.0], [1.0]]
+
+
+@pytest.mark.asyncio
+@patch.object(OpenAIEmbedder, "_get_client")
+async def test_embed_documents_preserves_order_across_batches(mock_get_client: MagicMock) -> None:
+    """Large inputs span multiple 512-batches; vectors must stay aligned to inputs.
+
+    OpenAI's `index` is per-request (0-based within each batch), so correctness
+    relies on sorting within each batch AND extending batches in call order.
+    """
+
+    def make_resp(offset: int, count: int) -> MagicMock:
+        # data deliberately reversed to exercise the within-batch index sort.
+        items = [MagicMock(embedding=[offset + i], index=i) for i in range(count)]
+        resp = MagicMock()
+        resp.data = list(reversed(items))
+        return resp
+
+    mock_client = AsyncMock()
+    # 513 inputs with _BATCH_SIZE=512 → two calls: 512 then 1.
+    mock_client.embeddings.create = AsyncMock(side_effect=[make_resp(0, 512), make_resp(1000, 1)])
+    mock_get_client.return_value = mock_client
+
+    embedder = OpenAIEmbedder(api_key=_TEST_KEY, model="text-embedding-3-large", dimensions=1536)
+    result = await embedder.embed_documents([f"t{i}" for i in range(513)])
+
+    assert len(result) == 513
+    assert result[0] == [0]
+    assert result[511] == [511]
+    assert result[512] == [1000]  # first (only) vector of the second batch
+    assert mock_client.embeddings.create.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -60,7 +93,7 @@ async def test_embed_documents_count_mismatch_raises(mock_get_client: MagicMock)
     mock_client.embeddings.create = AsyncMock(return_value=mock_response)
     mock_get_client.return_value = mock_client
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
+    embedder = OpenAIEmbedder(api_key=_TEST_KEY, model="text-embedding-3-large", dimensions=1536)
     with pytest.raises(InvalidOperationError, match="1 vectors for 2 chunks"):
         await embedder.embed_documents(["a", "b"])
 
@@ -78,7 +111,7 @@ async def test_embed_documents_replaces_blank_with_space(mock_get_client: MagicM
     mock_client.embeddings.create = AsyncMock(return_value=mock_response)
     mock_get_client.return_value = mock_client
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
+    embedder = OpenAIEmbedder(api_key=_TEST_KEY, model="text-embedding-3-large", dimensions=1536)
 
     await embedder.embed_documents(["   "])  # blank text
     call_args = mock_client.embeddings.create.call_args
@@ -91,7 +124,7 @@ async def test_embed_documents_replaces_blank_with_space(mock_get_client: MagicM
 async def test_embed_query_delegates_to_embed_documents(mock_embed_docs: AsyncMock) -> None:
     mock_embed_docs.return_value = [[0.1, 0.2]]
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
+    embedder = OpenAIEmbedder(api_key=_TEST_KEY, model="text-embedding-3-large", dimensions=1536)
     result = await embedder.embed_query("hello")
     assert result == [0.1, 0.2]
     mock_embed_docs.assert_called_once_with(["hello"])
@@ -102,6 +135,6 @@ async def test_embed_query_delegates_to_embed_documents(mock_embed_docs: AsyncMo
 async def test_embed_query_returns_empty_when_no_results(mock_embed_docs: AsyncMock) -> None:
     mock_embed_docs.return_value = []
 
-    embedder = OpenAIEmbedder(api_key="sk-test-key-12345678", model="text-embedding-3-large", dimensions=1536)
+    embedder = OpenAIEmbedder(api_key=_TEST_KEY, model="text-embedding-3-large", dimensions=1536)
     result = await embedder.embed_query("hello")
     assert result == []
