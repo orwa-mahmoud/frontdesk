@@ -233,6 +233,20 @@ describe("ChatTestPage", () => {
     );
   });
 
+  it("shows the response latency on the AI message", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { response: "timed reply", thread_id: "t1", escalated: false, request_id: "r1" },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "q" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => expect(screen.getByText("timed reply")).toBeInTheDocument());
+    // A latency label like "0.00s" / "1.2s" is rendered next to the AI label.
+    expect(screen.getByText(/^\d+\.\d+s$/)).toBeInTheDocument();
+  });
+
   it("resets the conversation", async () => {
     vi.mocked(api.post).mockResolvedValue({
       data: { response: "reply", thread_id: "t1", escalated: false, request_id: "r1" },

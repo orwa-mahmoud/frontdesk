@@ -78,7 +78,8 @@
     "suggest1": "ما هي ساعات العمل لديكم؟",
     "suggest2": "أين موقعكم؟",
     "suggest3": "هل تقدّمون استرداد الأموال؟",
-    "thinking": "جارٍ التفكير…"
+    "thinking": "جارٍ التفكير…",
+    "secondsSuffix": " ث"
   },
   "conversations": {
     "title": "المحادثات",
