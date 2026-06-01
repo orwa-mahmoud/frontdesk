@@ -78,7 +78,8 @@
     "suggest1": "What are your opening hours?",
     "suggest2": "Where are you located?",
     "suggest3": "Do you offer refunds?",
-    "thinking": "Thinking…"
+    "thinking": "Thinking…",
+    "secondsSuffix": "s"
   },
   "conversations": {
     "title": "Conversations",

@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "@core/api/client";
+import { elapsedMsSince, monotonicNow } from "@shared/utils/clock";
 
 interface ChatSource {
   document_id: string;
@@ -32,6 +33,7 @@ interface ChatMessage {
   content: string;
   sources?: ChatSource[];
   escalated?: boolean;
+  latencyMs?: number;
 }
 
 interface ChatApiResponse {
@@ -83,7 +85,9 @@ export function ChatTestPage() {
     try {
       const payload: Record<string, string> = { message: text };
       if (threadId) payload.thread_id = threadId;
+      const startedAt = monotonicNow();
       const { data } = await api.post<ChatApiResponse>("/api/v1/chat", payload);
+      const latencyMs = elapsedMsSince(startedAt);
       if (data.thread_id && !threadId) {
         setThreadId(data.thread_id);
       }
@@ -95,6 +99,7 @@ export function ChatTestPage() {
           content: data.response,
           sources: data.sources,
           escalated: data.escalated,
+          latencyMs,
         },
       ]);
       if (data.escalated) {
@@ -187,6 +192,12 @@ export function ChatTestPage() {
                     <Badge size="xs" color="orange" variant="light">
                       {t("chat.escalatedBadge")}
                     </Badge>
+                  )}
+                  {m.role === "assistant" && m.latencyMs !== undefined && (
+                    <Text size="xs" c="dimmed" ml="auto">
+                      {(m.latencyMs / 1000).toFixed(m.latencyMs < 1000 ? 2 : 1)}
+                      {t("chat.secondsSuffix")}
+                    </Text>
                   )}
                 </Group>
                 <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
