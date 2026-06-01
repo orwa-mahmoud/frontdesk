@@ -13,7 +13,10 @@ export interface UseLanguageReturn {
 /** Read/switch the active language and its text direction. */
 export function useLanguage(): UseLanguageReturn {
   const { i18n } = useTranslation();
-  const language = (i18n.resolvedLanguage ?? "en") as Language;
+  const raw = i18n.resolvedLanguage ?? "en";
+  const language: Language = (SUPPORTED_LANGUAGES as readonly string[]).includes(raw)
+    ? (raw as Language)
+    : "en";
   const setLanguage = useCallback(
     (next: Language) => {
       void i18n.changeLanguage(next);

@@ -188,7 +188,7 @@ describe("DocumentsPage", () => {
       expect(api.post).toHaveBeenCalledWith(
         "/api/v1/documents",
         expect.any(FormData),
-        expect.objectContaining({ headers: { "Content-Type": "multipart/form-data" }, timeout: 120_000 }),
+        expect.objectContaining({ headers: { "Content-Type": undefined }, timeout: 120_000 }),
       );
     });
   });
