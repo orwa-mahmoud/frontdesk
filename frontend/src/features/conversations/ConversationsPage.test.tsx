@@ -59,7 +59,7 @@ describe("ConversationsPage", () => {
     vi.mocked(api.get).mockRejectedValue(new Error("fail"));
     render(<ConversationsPage />, { wrapper: createWrapper() });
     await waitFor(() => {
-      expect(screen.getByText("Could not load conversations.")).toBeInTheDocument();
+      expect(screen.getByText("Could not load data")).toBeInTheDocument();
     });
   });
 
