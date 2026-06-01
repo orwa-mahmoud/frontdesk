@@ -143,6 +143,7 @@ async def chat_with_agent(inp: ChatInput, *, uow: UnitOfWork) -> ChatResult:
             retriever=retriever,
             uow=uow,
             max_tokens=tenant_config.llm_max_tokens,
+            temperature=tenant_config.llm_temperature,
         )
         result = await run_graph(
             graph,

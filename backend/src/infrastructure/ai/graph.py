@@ -139,6 +139,7 @@ def build_agent_graph(
     retriever: RetrieverPort,
     uow: UnitOfWork,
     max_tokens: int = 1024,
+    temperature: float | None = None,
 ) -> StateGraph[AgentState]:
     """Build a fresh (stateless) LangGraph for one agent turn."""
 
@@ -149,6 +150,7 @@ def build_agent_graph(
             _from_lc_messages(state["messages"]),
             tools=tool_schemas if tool_schemas else None,
             max_tokens=max_tokens,
+            temperature=temperature,
         )
         ai_msg = _to_ai_message(response.text, response.tool_calls)
         return {
