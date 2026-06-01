@@ -1,13 +1,32 @@
-import { Badge, Card, SimpleGrid, Stack, Text, Title } from "@mantine/core";
-import { IconMessageCircle } from "@tabler/icons-react";
+import {
+  Alert,
+  Badge,
+  Card,
+  Center,
+  Drawer,
+  Group,
+  Loader,
+  SimpleGrid,
+  Stack,
+  Text,
+  Title,
+} from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { IconEye, IconMessageCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import type { TFunction } from "i18next";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "@core/api/client";
-import { DataTable, SelectFilter, useFrontendData, type ColumnDef } from "@shared/components/datatable";
+import {
+  DataTable,
+  SelectFilter,
+  useFrontendData,
+  type ColumnDef,
+  type RowAction,
+} from "@shared/components/datatable";
 import { EmptyState } from "@shared/components/EmptyState";
 
 interface ConversationSummary {
@@ -15,6 +34,13 @@ interface ConversationSummary {
   thread_id: string;
   channel: string;
   last_message_at: string | null;
+  created_at: string;
+}
+
+interface ConversationMessage {
+  id: string;
+  role: string;
+  content: string;
   created_at: string;
 }
 
@@ -41,6 +67,78 @@ async function getDailySummary(): Promise<DailySummary> {
   return data;
 }
 
+async function getMessages(id: string): Promise<ConversationMessage[]> {
+  const { data } = await api.get<ConversationMessage[]>(`/api/v1/conversations/${id}/messages`);
+  return data;
+}
+
+function TranscriptDrawer({
+  conversationId,
+  opened,
+  onClose,
+}: Readonly<{ conversationId: string | null; opened: boolean; onClose: () => void }>) {
+  const { t } = useTranslation();
+  const messagesQuery = useQuery({
+    queryKey: ["conversation-messages", conversationId],
+    queryFn: () => getMessages(conversationId ?? ""),
+    enabled: opened && conversationId !== null,
+  });
+
+  return (
+    <Drawer
+      opened={opened}
+      onClose={onClose}
+      title={t("conversations.transcript")}
+      position="right"
+      size="lg"
+      padding="lg"
+    >
+      {messagesQuery.isLoading && (
+        <Center py="xl">
+          <Loader />
+        </Center>
+      )}
+      {messagesQuery.isError && <Alert color="red">{t("conversations.loadMessagesError")}</Alert>}
+      {messagesQuery.isSuccess && messagesQuery.data.length === 0 && (
+        <Text c="dimmed" ta="center" py="xl">
+          {t("conversations.noMessages")}
+        </Text>
+      )}
+      {messagesQuery.isSuccess && messagesQuery.data.length > 0 && (
+        <Stack gap="sm">
+          {messagesQuery.data.map((m) => {
+            const isVisitor = m.role === "user";
+            return (
+              <Card
+                key={m.id}
+                withBorder
+                radius="md"
+                p="sm"
+                bg={isVisitor ? "gray.0" : "coral.0"}
+                ml={isVisitor ? 0 : "auto"}
+                mr={isVisitor ? "auto" : 0}
+                maw="85%"
+              >
+                <Group justify="space-between" mb={4} gap="sm">
+                  <Text size="xs" fw={600} c={isVisitor ? "dimmed" : "coral.7"}>
+                    {isVisitor ? t("conversations.visitor") : t("conversations.assistant")}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {dayjs(m.created_at).format("MMM D, HH:mm")}
+                  </Text>
+                </Group>
+                <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                  {m.content}
+                </Text>
+              </Card>
+            );
+          })}
+        </Stack>
+      )}
+    </Drawer>
+  );
+}
+
 function StatCard({ label, value }: Readonly<{ label: string; value: string | number }>) {
   return (
     <Card withBorder radius="md" p="lg">
@@ -58,6 +156,24 @@ export function ConversationsPage() {
   const { t } = useTranslation();
   const conversationsQuery = useQuery({ queryKey: ["conversations"], queryFn: listConversations });
   const summaryQuery = useQuery({ queryKey: ["daily-summary"], queryFn: getDailySummary });
+
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [transcriptOpen, transcript] = useDisclosure(false);
+
+  const rowActions = useMemo<RowAction<ConversationSummary>[]>(
+    () => [
+      {
+        key: "view",
+        label: t("conversations.view"),
+        icon: <IconEye size={16} />,
+        onClick: (c) => {
+          setActiveId(c.id);
+          transcript.open();
+        },
+      },
+    ],
+    [t, transcript],
+  );
 
   const columns = useMemo<ColumnDef<ConversationSummary>[]>(
     () => [
@@ -137,6 +253,7 @@ export function ConversationsPage() {
         source={source}
         columns={columns}
         rowKey={(c) => c.id}
+        rowActions={rowActions}
         tableLabel={t("conversations.title")}
         searchPlaceholder={t("conversations.searchPlaceholder")}
         emptyState={
@@ -156,6 +273,8 @@ export function ConversationsPage() {
         }
         filterLabels={{ channel: (v) => `${t("conversations.colChannel")}: ${channelLabel(t, String(v))}` }}
       />
+
+      <TranscriptDrawer conversationId={activeId} opened={transcriptOpen} onClose={transcript.close} />
     </Stack>
   );
 }

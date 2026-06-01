@@ -92,7 +92,13 @@
     "colCreated": "تاريخ الإنشاء",
     "statMessagesToday": "رسائل اليوم",
     "statActive": "المحادثات النشطة",
-    "statEscalated": "المُصعّدة اليوم"
+    "statEscalated": "المُصعّدة اليوم",
+    "view": "عرض النص",
+    "transcript": "نص المحادثة",
+    "noMessages": "لا توجد رسائل في هذه المحادثة بعد.",
+    "loadMessagesError": "تعذّر تحميل نص المحادثة.",
+    "visitor": "الزائر",
+    "assistant": "الذكاء الاصطناعي"
   },
   "documents": {
     "title": "قاعدة المعرفة",
