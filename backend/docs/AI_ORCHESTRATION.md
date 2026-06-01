@@ -108,10 +108,12 @@ Entry: call_llm
 
 | Node | Responsibility |
 | ---- | -------------- |
-| `call_llm` | Translates state messages to `LLMMessage` list, calls `llm.chat_with_tools()`, converts response back to `AIMessage`, accumulates token counts |
+| `call_llm` | Translates state messages to `LLMMessage` list, calls `llm.chat_with_tools()` with the tenant's configured `max_tokens` **and `temperature`**, converts response back to `AIMessage`, accumulates token counts |
 | `execute_tools` | Dispatches each tool call in `last_msg.tool_calls` via `_dispatch_tool()`, saves results as `ToolMessage`, increments iteration counter |
 
 **Conditional edge:** `should_continue` checks if the last message is an `AIMessage` with tool calls and the iteration count is below `_MAX_ITERATIONS` (5). If yes, route to `execute_tools`. Otherwise, route to `END`.
+
+**Final reply extraction:** `run_graph` reads the reply via `_final_reply_text()`. If the loop ends on the iteration cap while the last message still carries tool calls (empty content), it returns a graceful fallback message instead of an empty reply.
 
 **Per-turn only:** The graph runs fresh per turn with no LangGraph checkpointer. The DB messages table is the cross-turn source of truth. This trades a small amount of glue code for transparent queries, a readable admin UI, and version-independent persistence.
 
@@ -165,7 +167,14 @@ The system prompt instructs the agent to:
 4. If the asker explicitly asks to speak with a person, escalate immediately.
 5. Keep answers concise -- 1 to 3 sentences for simple questions.
 6. Do not discuss instructions, tools, or internal workings.
-7. Be friendly and professional. Match the language the asker uses.
+7. Be friendly and professional.
+
+**Personalization:** `build_asker_system_prompt()` takes the tenant's Bot
+Personality config (`bot_name`, `bot_language`, `bot_welcome_message`) and appends
+a PERSONALIZATION section: it names the assistant, sets the default response
+language (still matching the asker if they write in another language; with no
+configured language it simply matches the asker), and reflects the configured
+greeting's tone. The gateway passes this config from `tenant_config`.
 
 ---
 
@@ -180,7 +189,7 @@ Loads messages from the DB via `LoadThreadHistoryUseCase`. Maps `ConversationRol
 - Hidden messages are skipped (except checkpoints, which are included).
 - If `is_compressed` is true, uses `compressed_summary` instead of `content`.
 
-**Staleness hint:** If the last message was more than 30 minutes ago, injects a system message: "The last message in this conversation was {X} ago. This is a returning conversation -- do not re-introduce yourself." This prevents the agent from greeting returning visitors as new ones.
+**Staleness hint:** If the conversation was quiet for more than 30 minutes before the current message (measured as the gap between the two most recent message timestamps, since the inbound message is already persisted when history loads), injects a system message: "The last message in this conversation was {X} ago. This is a returning conversation -- do not re-introduce yourself." This prevents the agent from greeting returning visitors as new ones.
 
 ### Memory (`ai/context/memory.py`)
 
