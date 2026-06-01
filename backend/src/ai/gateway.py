@@ -17,6 +17,8 @@ Every channel (WhatsApp webhook, Telegram webhook, API) calls
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
+from typing import Any
 
 import redis.asyncio as aioredis
 import structlog
@@ -30,7 +32,7 @@ from src.ai.tools.escalate_question import ESCALATE_QUESTION_DEF
 from src.ai.tools.remove_key_fact import REMOVE_KEY_FACT_DEF
 from src.ai.tools.save_key_fact import SAVE_KEY_FACT_DEF
 from src.ai.tools.search_documents import SEARCH_DOCUMENTS_DEF
-from src.ai.types import AgentLoopResult, ChatInput, ChatResult
+from src.ai.types import AgentLoopResult, ChatInput, ChatResult, ChatSource
 from src.ai.utils.sender import resolve_sender
 from src.application.conversations.commands import SaveThreadMessage
 from src.application.conversations.use_cases.save_thread_message import SaveThreadMessageUseCase
@@ -200,7 +202,36 @@ async def chat_with_agent(inp: ChatInput, *, uow: UnitOfWork) -> ChatResult:
         thread_id=thread_id,
         escalated=escalated,
         request_id=request_id,
+        sources=_extract_sources(result),
     )
+
+
+def _iter_search_rows(result: AgentLoopResult) -> Iterator[dict[str, Any]]:
+    """Yield each result row from every search_documents tool call."""
+    for tc in result.tool_calls:
+        if tc.tool_name == "search_documents" and isinstance(tc.result, list):
+            yield from (row for row in tc.result if isinstance(row, dict))
+
+
+def _extract_sources(result: AgentLoopResult, *, limit: int = 5, snippet_len: int = 240) -> list[ChatSource]:
+    """Collect the best retrieved chunk per document from search_documents calls.
+
+    Lets the dashboard chat show which uploaded documents grounded the answer.
+    """
+    best: dict[str, ChatSource] = {}
+    for row in _iter_search_rows(result):
+        document_id = str(row.get("document_id") or "")
+        if not document_id:
+            continue
+        score = float(row.get("score") or 0.0)
+        existing = best.get(document_id)
+        if existing is None or score > existing.score:
+            best[document_id] = ChatSource(
+                document_id=document_id,
+                snippet=str(row.get("content") or "")[:snippet_len],
+                score=score,
+            )
+    return sorted(best.values(), key=lambda s: s.score, reverse=True)[:limit]
 
 
 async def _save_agent_messages(

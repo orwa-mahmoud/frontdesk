@@ -1,15 +1,37 @@
-import { Button, Card, Group, ScrollArea, Stack, Text, Textarea, Title } from "@mantine/core";
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Card,
+  Group,
+  Loader,
+  ScrollArea,
+  Stack,
+  Text,
+  Textarea,
+  Title,
+  Tooltip,
+} from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconSend } from "@tabler/icons-react";
-import { useState } from "react";
+import { IconFileText, IconRefresh, IconSend } from "@tabler/icons-react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "@core/api/client";
+
+interface ChatSource {
+  document_id: string;
+  snippet: string;
+  score: number;
+}
 
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  sources?: ChatSource[];
+  escalated?: boolean;
 }
 
 interface ChatApiResponse {
@@ -17,6 +39,17 @@ interface ChatApiResponse {
   thread_id: string;
   escalated: boolean;
   request_id: string;
+  sources?: ChatSource[];
+}
+
+interface DocumentLite {
+  id: string;
+  filename: string;
+}
+
+async function listDocuments(): Promise<DocumentLite[]> {
+  const { data } = await api.get<DocumentLite[]>("/api/v1/documents");
+  return data;
 }
 
 export function ChatTestPage() {
@@ -25,10 +58,24 @@ export function ChatTestPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
-  const send = async () => {
-    const text = input.trim();
-    if (!text) return;
+  // Map document_id → filename so retrieved sources show the real file name.
+  const documentsQuery = useQuery({ queryKey: ["documents"], queryFn: listDocuments });
+  const documentName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const d of documentsQuery.data ?? []) map.set(d.id, d.filename);
+    return (id: string) => map.get(id) ?? `${id.slice(0, 8)}…`;
+  }, [documentsQuery.data]);
+
+  // Auto-scroll to the latest message.
+  useEffect(() => {
+    viewportRef.current?.scrollTo?.({ top: viewportRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, sending]);
+
+  const send = async (textArg?: string) => {
+    const text = (textArg ?? input).trim();
+    if (!text || sending) return;
     setInput("");
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: text }]);
     setSending(true);
@@ -42,7 +89,13 @@ export function ChatTestPage() {
       }
       setMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: "assistant", content: data.response },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: data.response,
+          sources: data.sources,
+          escalated: data.escalated,
+        },
       ]);
       if (data.escalated) {
         notifications.show({ color: "orange", message: t("chat.escalated") });
@@ -54,22 +107,58 @@ export function ChatTestPage() {
     }
   };
 
+  const resetConversation = () => {
+    setMessages([]);
+    setThreadId(null);
+    setInput("");
+  };
+
+  const suggestions = [t("chat.suggest1"), t("chat.suggest2"), t("chat.suggest3")];
+
   return (
     <Stack>
-      <div>
-        <Title order={2}>{t("chat.title")}</Title>
-        <Text c="dimmed" size="sm">
-          {t("chat.subtitle")}
-        </Text>
-      </div>
+      <Group justify="space-between" align="flex-start">
+        <div>
+          <Title order={2}>{t("chat.title")}</Title>
+          <Text c="dimmed" size="sm">
+            {t("chat.subtitle")}
+          </Text>
+        </div>
+        {messages.length > 0 && (
+          <Tooltip label={t("chat.reset")}>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              onClick={resetConversation}
+              aria-label={t("chat.reset")}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
 
       <Card withBorder radius="md" p={0} style={{ height: "60vh", display: "flex", flexDirection: "column" }}>
-        <ScrollArea style={{ flex: 1 }} p="md">
+        <ScrollArea style={{ flex: 1 }} p="md" viewportRef={viewportRef}>
           <Stack gap="sm" role="log" aria-live="polite">
             {messages.length === 0 && (
-              <Text c="dimmed" ta="center" py="xl">
-                {t("chat.empty")}
-              </Text>
+              <Stack align="center" gap="md" py="xl">
+                <Text c="dimmed" ta="center">
+                  {t("chat.empty")}
+                </Text>
+                <Stack gap={6} align="center">
+                  <Text size="xs" c="dimmed" fw={600} tt="uppercase">
+                    {t("chat.suggestionsLabel")}
+                  </Text>
+                  <Group justify="center" gap="xs">
+                    {suggestions.map((s) => (
+                      <Button key={s} size="xs" variant="light" color="coral" onClick={() => void send(s)}>
+                        {s}
+                      </Button>
+                    ))}
+                  </Group>
+                </Stack>
+              </Stack>
             )}
             {messages.map((m) => (
               <Card
@@ -82,14 +171,51 @@ export function ChatTestPage() {
                 mr={m.role === "assistant" ? "auto" : 0}
                 maw="80%"
               >
-                <Text size="xs" fw={600} c={m.role === "user" ? "dimmed" : "coral.7"} mb={4}>
-                  {m.role === "user" ? t("chat.you") : t("chat.ai")}
-                </Text>
+                <Group gap="xs" mb={4}>
+                  <Text size="xs" fw={600} c={m.role === "user" ? "dimmed" : "coral.7"}>
+                    {m.role === "user" ? t("chat.you") : t("chat.ai")}
+                  </Text>
+                  {m.escalated && (
+                    <Badge size="xs" color="orange" variant="light">
+                      {t("chat.escalatedBadge")}
+                    </Badge>
+                  )}
+                </Group>
                 <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
                   {m.content}
                 </Text>
+                {m.sources && m.sources.length > 0 && (
+                  <Group gap={6} mt="xs" wrap="wrap">
+                    <Text size="xs" c="dimmed" fw={600}>
+                      {t("chat.sources")}:
+                    </Text>
+                    {m.sources.map((s) => (
+                      <Tooltip key={s.document_id} label={s.snippet} multiline maw={320} withArrow>
+                        <Badge
+                          size="sm"
+                          variant="outline"
+                          color="gray"
+                          leftSection={<IconFileText size={12} />}
+                          style={{ cursor: "help", textTransform: "none" }}
+                        >
+                          {documentName(s.document_id)}
+                        </Badge>
+                      </Tooltip>
+                    ))}
+                  </Group>
+                )}
               </Card>
             ))}
+            {sending && (
+              <Card withBorder radius="md" p="sm" bg="coral.0" mr="auto" maw="80%">
+                <Group gap="xs">
+                  <Loader size="xs" color="coral" />
+                  <Text size="sm" c="dimmed">
+                    {t("chat.thinking")}
+                  </Text>
+                </Group>
+              </Card>
+            )}
           </Stack>
         </ScrollArea>
         <Group p="md" style={{ borderTop: "1px solid var(--mantine-color-gray-3)" }}>

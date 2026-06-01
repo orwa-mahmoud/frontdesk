@@ -166,4 +166,85 @@ describe("ChatTestPage", () => {
     fireEvent.keyDown(ta, { key: "a", shiftKey: false });
     expect(api.post).not.toHaveBeenCalled();
   });
+
+  it("renders RAG sources with the document filename", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [{ id: "d1", filename: "guide.pdf" }] });
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        response: "From your guide",
+        thread_id: "t1",
+        escalated: false,
+        request_id: "r1",
+        sources: [{ document_id: "d1", snippet: "the answer text", score: 0.91 }],
+      },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "q" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => expect(screen.getByText("From your guide")).toBeInTheDocument());
+    expect(screen.getByText("Sources:")).toBeInTheDocument();
+    expect(screen.getByText("guide.pdf")).toBeInTheDocument();
+  });
+
+  it("falls back to a short id when the document filename is unknown", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        response: "answer",
+        thread_id: "t1",
+        escalated: false,
+        request_id: "r1",
+        sources: [{ document_id: "abcdef1234567890", snippet: "snip", score: 0.5 }],
+      },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "q" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => expect(screen.getByText("answer")).toBeInTheDocument());
+    expect(screen.getByText("abcdef12…")).toBeInTheDocument();
+  });
+
+  it("shows an escalated badge on the message", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { response: "esc", thread_id: "t1", escalated: true, request_id: "r1" },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "q" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => expect(screen.getByText("Escalated to inbox")).toBeInTheDocument());
+  });
+
+  it("sends a suggested prompt from the empty state", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { response: "ans", thread_id: "t1", escalated: false, request_id: "r1" },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.click(screen.getByText("What are your opening hours?"));
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith("/api/v1/chat", { message: "What are your opening hours?" }),
+    );
+  });
+
+  it("resets the conversation", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { response: "reply", thread_id: "t1", escalated: false, request_id: "r1" },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "hi" } });
+    fireEvent.click(screen.getByText("Send"));
+    await waitFor(() => expect(screen.getByText("reply")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("New conversation"));
+    expect(screen.queryByText("reply")).not.toBeInTheDocument();
+    expect(screen.getByText(/send a message to test/i)).toBeInTheDocument();
+  });
 });

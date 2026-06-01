@@ -70,7 +70,15 @@
     "send": "Send",
     "sendAria": "Send message",
     "escalated": "Question escalated to the owner inbox.",
-    "error": "Could not get a response. Check Settings → LLM."
+    "error": "Could not get a response. Check Settings → LLM.",
+    "reset": "New conversation",
+    "sources": "Sources",
+    "escalatedBadge": "Escalated to inbox",
+    "suggestionsLabel": "Try asking:",
+    "suggest1": "What are your opening hours?",
+    "suggest2": "Where are you located?",
+    "suggest3": "Do you offer refunds?",
+    "thinking": "Thinking…"
   },
   "conversations": {
     "title": "Conversations",
@@ -91,6 +99,7 @@
     "subtitle": "Upload PDFs, Markdown, or DOCX. The AI grounds its answers in these documents using hybrid (vector + BM25) retrieval over pgvector.",
     "searchPlaceholder": "Search files",
     "upload": "Upload file",
+    "testInChat": "Test in chat",
     "uploaded": "Document ingested.",
     "uploadFailed": "Upload failed. Check file type (PDF, DOCX, Markdown, plain text).",
     "deleted": "Document removed.",
