@@ -7,8 +7,10 @@ import {
   type UseMutationResult,
 } from "@tanstack/react-query";
 
-export interface MutationNotificationOptions<TData, TError, TVariables>
-  extends Omit<UseMutationOptions<TData, TError, TVariables>, "onSuccess" | "onError"> {
+export interface MutationNotificationOptions<TData, TError, TVariables> extends Omit<
+  UseMutationOptions<TData, TError, TVariables>,
+  "onSuccess" | "onError"
+> {
   /** Shown (teal) on success. */
   successMessage?: string;
   /** Shown (red) on error. */
