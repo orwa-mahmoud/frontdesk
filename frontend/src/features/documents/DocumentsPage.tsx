@@ -44,8 +44,11 @@ async function listDocuments(): Promise<DocumentSummary[]> {
 async function uploadDocument(file: File): Promise<DocumentSummary> {
   const formData = new FormData();
   formData.append("file", file);
+  // Clear the instance's default application/json so axios sets
+  // `multipart/form-data; boundary=...` itself — a hardcoded multipart header
+  // omits the boundary and the server can't parse the body.
   const { data } = await api.post<DocumentSummary>("/api/v1/documents", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+    headers: { "Content-Type": undefined },
     timeout: 120_000,
   });
   return data;

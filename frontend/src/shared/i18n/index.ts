@@ -28,6 +28,10 @@ void i18n
     fallbackLng: "en",
     defaultNS: "common",
     supportedLngs: SUPPORTED_LANGUAGES,
+    // Collapse region codes ("en-US" → "en") so resolvedLanguage is always one
+    // of SUPPORTED_LANGUAGES.
+    load: "languageOnly",
+    nonExplicitSupportedLngs: true,
     interpolation: { escapeValue: false },
     detection: {
       order: ["localStorage", "navigator"],

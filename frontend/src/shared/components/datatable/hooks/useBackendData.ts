@@ -39,7 +39,8 @@ export function useBackendData<TRow, TParams extends TableQueryParams, TPage = P
   const { page, limit, search, sortBy, sortDir, extra } = state;
 
   const params = useMemo(() => {
-    const merged: Record<string, unknown> = { ...extra, ...baseParams };
+    // baseParams first, then user filters (extra) and table state win.
+    const merged: Record<string, unknown> = { ...baseParams, ...extra };
     merged.page = page;
     merged.limit = limit;
     merged.search = search || undefined;
@@ -85,7 +86,9 @@ export function useBackendData<TRow, TParams extends TableQueryParams, TPage = P
     error: query.error ?? null,
     refetch: query.refetch,
     paginationMode: resolvedMode,
-    page,
+    // Clamp a stale/oversized URL page (e.g. a filter shrank the result set) so
+    // the paged control and the next request never point past the last page.
+    page: paged && total > 0 ? Math.min(page, Math.max(1, Math.ceil(total / limit))) : page,
     limit,
     search,
     sortBy,

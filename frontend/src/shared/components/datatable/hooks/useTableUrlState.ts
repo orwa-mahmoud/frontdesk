@@ -69,9 +69,18 @@ export function useTableUrlState(options: UseTableUrlStateOptions = {}): TableUr
       : (defaults?.sortDir ?? "asc")
     : undefined;
 
+  // Depend on serialized key lists, not array identity — callers commonly pass
+  // inline arrays, which would otherwise make `extra` a new object every render.
+  const numberKeysSig = numberExtraKeys.join(",");
+  const arrayKeysSig = arrayExtraKeys.join(",");
   const extra = useMemo(
-    () => parseExtra(params, numberExtraKeys, arrayExtraKeys),
-    [params, numberExtraKeys, arrayExtraKeys],
+    () =>
+      parseExtra(
+        params,
+        numberKeysSig ? numberKeysSig.split(",") : [],
+        arrayKeysSig ? arrayKeysSig.split(",") : [],
+      ),
+    [params, numberKeysSig, arrayKeysSig],
   );
 
   const update = useCallback(
