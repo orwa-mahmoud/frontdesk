@@ -22,7 +22,7 @@ export function RegisterPage() {
       tenant_slug: "",
     },
     validate: {
-      email: (v) => (/^\S+@\S+\.\S+$/.test(v) ? null : t("auth.errInvalidEmail")),
+      email: (v) => (/^[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+$/.test(v) ? null : t("auth.errInvalidEmail")),
       password: (v) => (v.length >= 8 ? null : t("auth.errPasswordMin")),
       tenant_name: (v) => (v.trim().length > 0 ? null : t("auth.errRequired")),
       tenant_slug: (v) => (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v) && v.length >= 2 ? null : t("auth.errSlug")),

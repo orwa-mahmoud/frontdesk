@@ -1,6 +1,7 @@
 import { Select } from "@mantine/core";
 
 import type { TableSource } from "../hooks/TableSource";
+import type { ExtraFilters } from "../types";
 
 export interface SelectFilterProps<TRow> {
   readonly source: TableSource<TRow>;
@@ -8,6 +9,12 @@ export interface SelectFilterProps<TRow> {
   readonly label: string;
   readonly placeholder?: string;
   readonly data: ReadonlyArray<{ value: string; label: string }>;
+}
+
+function toSelectValue(current: ExtraFilters[string]): string | null {
+  if (typeof current === "string") return current;
+  if (current == null) return null;
+  return String(current);
 }
 
 /** Single-select filter bound to `source.extra[filterKey]`. */
@@ -18,8 +25,7 @@ export function SelectFilter<TRow>({
   placeholder,
   data,
 }: Readonly<SelectFilterProps<TRow>>) {
-  const current = source.extra[filterKey];
-  const value = typeof current === "string" ? current : current == null ? null : String(current);
+  const value = toSelectValue(source.extra[filterKey]);
 
   return (
     <Select

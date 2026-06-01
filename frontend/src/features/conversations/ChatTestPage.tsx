@@ -152,7 +152,15 @@ export function ChatTestPage() {
                   </Text>
                   <Group justify="center" gap="xs">
                     {suggestions.map((s) => (
-                      <Button key={s} size="xs" variant="light" color="coral" onClick={() => void send(s)}>
+                      <Button
+                        key={s}
+                        size="xs"
+                        variant="light"
+                        color="coral"
+                        onClick={() => {
+                          send(s);
+                        }}
+                      >
                         {s}
                       </Button>
                     ))}
@@ -230,12 +238,14 @@ export function ChatTestPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                void send();
+                send();
               }
             }}
           />
           <Button
-            onClick={() => void send()}
+            onClick={() => {
+              send();
+            }}
             loading={sending}
             disabled={sending}
             aria-label={t("chat.sendAria")}

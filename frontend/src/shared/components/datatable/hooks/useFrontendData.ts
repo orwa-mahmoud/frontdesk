@@ -65,8 +65,8 @@ export function useFrontendData<TRow>(options: UseFrontendDataOptions<TRow>): Ta
   } = options;
 
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY) ?? false;
-  const resolvedMode: "infinite" | "paged" =
-    paginationMode === "auto" ? (isMobile ? "infinite" : "paged") : paginationMode;
+  const autoMode: "infinite" | "paged" = isMobile ? "infinite" : "paged";
+  const resolvedMode: "infinite" | "paged" = paginationMode === "auto" ? autoMode : paginationMode;
 
   const state = useTableUrlState(options.urlState);
   const { page, limit, search, sortBy, sortDir, extra } = state;

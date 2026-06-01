@@ -17,7 +17,7 @@ export function dirFor(language: string): "ltr" | "rtl" {
 
 // Resources are bundled (not fetched), so init is synchronous — `t()` returns
 // real strings on first render, in the app and in tests alike.
-void i18n
+i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({

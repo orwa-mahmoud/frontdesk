@@ -65,8 +65,11 @@ export interface TableQueryParams {
   sortDir?: SortDirection;
 }
 
+/** A single "extra" (per-column) filter value. */
+export type ExtraFilterValue = string | string[] | number | undefined;
+
 /** Active "extra" (per-column) filter values, keyed by column key. */
-export type ExtraFilters = Record<string, string | string[] | number | undefined>;
+export type ExtraFilters = Record<string, ExtraFilterValue>;
 
 /** How pagination renders. `auto` = infinite on mobile, paged on desktop. */
 export type PaginationMode = "infinite" | "paged" | "auto";

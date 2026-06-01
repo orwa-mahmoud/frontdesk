@@ -16,7 +16,7 @@ export function LoginPage() {
   const form = useForm({
     initialValues: { email: "", password: "" },
     validate: {
-      email: (v) => (/^\S+@\S+\.\S+$/.test(v) ? null : t("auth.errInvalidEmail")),
+      email: (v) => (/^[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+$/.test(v) ? null : t("auth.errInvalidEmail")),
       password: (v) => (v.length >= 8 ? null : t("auth.errPasswordMin")),
     },
   });

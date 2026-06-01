@@ -6,6 +6,7 @@ import type { ColumnDef } from "./types";
 export function renderCell<TRow>(column: ColumnDef<TRow>, row: TRow): ReactNode {
   if (column.Cell) return <column.Cell row={row} />;
   if (column.accessor) return column.accessor(row);
-  const value = typeof row === "object" && row !== null ? (row as Record<string, unknown>)[column.key] : undefined;
+  const value =
+    typeof row === "object" && row !== null ? (row as Record<string, unknown>)[column.key] : undefined;
   return value === null || value === undefined ? "" : String(value);
 }
