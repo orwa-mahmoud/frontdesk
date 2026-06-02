@@ -29,11 +29,12 @@ Environment variables:
 
 ## What it exercises
 
-`k6_smoke.js` registers a fresh owner per VU, then loops authenticated reads
-(`/auth/me`, `/conversations`, `/documents`, `/invitations`) — the hot,
-external-dependency-free paths. Thresholds fail the run if p95 latency or the
-error rate exceed the budgets defined at the top of the script; tune them to
-your SLOs.
+`k6_smoke.js` registers one owner in `setup()`, then every VU loops
+authenticated reads (`/auth/me`, `/conversations`, `/documents`,
+`/invitations`) — the hot, external-dependency-free paths (registration/login
+are rate-limited, so they're kept out of the per-iteration loop). Thresholds
+fail the run if p95 latency or the error rate exceed the budgets at the top of
+the script; tune them to your SLOs.
 
 > Note: the chat / RAG paths are intentionally **not** load-tested here because
 > they call third-party LLM + embedding APIs (cost + rate limits). Add a

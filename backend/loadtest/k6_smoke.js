@@ -20,12 +20,15 @@ export const options = {
   },
 };
 
-function registerOwner() {
+// setup() runs once before the VUs ramp: register a single owner and hand its
+// token to every VU. This keeps the load on the hot READ paths (which aren't
+// rate-limited) rather than re-registering each iteration (register is 5/min).
+export function setup() {
   const slug = `lt-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const res = http.post(
     `${BASE_URL}/api/v1/auth/register`,
     JSON.stringify({
-      email: `${slug}@loadtest.local`,
+      email: `${slug}@loadtest.example.com`,
       password: "supersecure123",
       full_name: "Load Test",
       tenant_name: `LT ${slug}`,
@@ -33,19 +36,13 @@ function registerOwner() {
     }),
     { headers: { "Content-Type": "application/json" } },
   );
-  check(res, { "register 201": (r) => r.status === 201 });
-  errorRate.add(res.status !== 201);
-  return res.status === 201 ? res.json("access_token") : null;
+  check(res, { "setup register 201": (r) => r.status === 201 });
+  if (res.status !== 201) throw new Error(`setup register failed: ${res.status} ${res.body}`);
+  return { token: res.json("access_token") };
 }
 
-export default function () {
-  const token = registerOwner();
-  if (!token) {
-    sleep(1);
-    return;
-  }
-  const params = { headers: { Authorization: `Bearer ${token}` } };
-
+export default function (data) {
+  const params = { headers: { Authorization: `Bearer ${data.token}` } };
   for (const path of ["/api/v1/auth/me", "/api/v1/conversations", "/api/v1/documents", "/api/v1/invitations"]) {
     const res = http.get(`${BASE_URL}${path}`, params);
     check(res, { [`GET ${path} ok`]: (r) => r.status === 200 });
