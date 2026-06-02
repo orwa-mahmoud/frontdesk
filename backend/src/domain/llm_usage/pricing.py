@@ -96,7 +96,11 @@ def calculate_cost(
     cache_read_tokens: int,
     output_tokens: int,
 ) -> ComputedCost:
-    """Compute USD cost for a single LLM call. Unknown models cost 0 (logged elsewhere)."""
+    """Compute USD cost for a single LLM call.
+
+    Unknown models cost 0 — RecordTokenUsageUseCase logs a warning so the gap is
+    visible (the domain stays pure and cannot log).
+    """
     pricing = get_model_pricing(model)
     if pricing is None:
         zero = Decimal("0")
