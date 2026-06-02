@@ -94,6 +94,14 @@ describe("ProtectedShell", () => {
     expect(screen.getByText("Page")).toBeInTheDocument();
   });
 
+  it("exposes a focusable main landmark the skip link can target", () => {
+    const { container } = renderShell(USER_WITH_NAME);
+    const main = container.querySelector("#main-content");
+    expect(main).not.toBeNull();
+    // tabIndex=-1 lets the skip link move keyboard focus, not just scroll.
+    expect(main).toHaveAttribute("tabindex", "-1");
+  });
+
   it("marks non-root nav as active on matching path", () => {
     renderShell(USER_WITH_NAME, "/documents");
     const docsLink = screen.getByText("Documents").closest("a");
