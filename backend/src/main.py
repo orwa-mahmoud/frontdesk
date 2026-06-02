@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import IntegrityError
 from starlette.responses import Response as StarletteResponse
 
 from src.bootstrap.event_handlers import register_event_handlers
@@ -18,7 +19,7 @@ from src.config.settings import get_settings
 from src.domain.shared.exceptions import DomainError
 from src.drivers.api.middleware.rate_limit import limiter
 from src.drivers.api.middleware.request_id import RequestIDMiddleware
-from src.drivers.api.responses import domain_error_handler
+from src.drivers.api.responses import domain_error_handler, integrity_error_handler
 from src.drivers.api.v1.health.routes import router as health_router
 from src.drivers.api.v1.router import v1_router
 from src.drivers.api.webhooks.telegram import router as telegram_webhook_router
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(DomainError, domain_error_handler)
     app.add_exception_handler(RateLimitExceeded, _handle_rate_limit)
+    app.add_exception_handler(IntegrityError, integrity_error_handler)
 
     @app.get("/metrics", tags=["health"], include_in_schema=False)
     async def metrics() -> StarletteResponse:
