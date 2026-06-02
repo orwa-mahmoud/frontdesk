@@ -12,6 +12,7 @@ The concrete wiring happens here (composition-root pattern).
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +44,7 @@ from src.infrastructure.persistence.postgres.repositories.user_repo import Postg
 from src.infrastructure.persistence.postgres.repositories.user_tenant_repo import (
     PostgresUserTenantRepository,
 )
+from src.infrastructure.persistence.postgres.rls import set_current_tenant
 
 if TYPE_CHECKING:
     from src.domain.contacts.repositories import ContactRepository
@@ -95,6 +97,14 @@ class UnitOfWork:
     def track(self, entity: BaseEntity) -> None:
         """Register an entity for post-commit event collection."""
         self._tracked_entities.append(entity)
+
+    async def set_tenant_scope(self, tenant_id: UUID) -> None:
+        """Scope this transaction to a tenant for Row-Level Security.
+
+        A no-op in effect under a superuser DB role (RLS bypassed); enforced once
+        the app connects as a non-superuser role. See infrastructure .../rls.py.
+        """
+        await set_current_tenant(self._session, tenant_id)
 
     async def flush(self) -> None:
         """Push pending inserts/updates to the DB without committing — useful

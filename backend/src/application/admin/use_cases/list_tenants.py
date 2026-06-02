@@ -24,6 +24,9 @@ class ListTenantsForAdmin:
         for tenant in tenants:
             links = await self._uow.user_tenants.list_for_tenant(tenant.id)
             owner_email = await self._resolve_owner_email(links)
+            # Re-scope per tenant so the document count is correct under RLS
+            # (the platform admin reads across every tenant).
+            await self._uow.set_tenant_scope(tenant.id)
             doc_count = await self._uow.documents.count_for_tenant(tenant.id)
             rows.append(
                 AdminTenantDTO(

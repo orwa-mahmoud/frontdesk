@@ -62,15 +62,21 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise AuthenticationError("User no longer exists or is disabled")
 
+    # Scope the DB transaction to this user's tenant for Row-Level Security.
+    # Harmless under a superuser role (RLS bypassed); enforced under a non-superuser
+    # role. Platform admins are scoped too, but their cross-tenant admin use cases
+    # re-scope per tenant as needed.
+    tenant_id_claim = payload.get("tenant_id")
+    if tenant_id_claim:
+        await uow.set_tenant_scope(UUID(tenant_id_claim))
+
     # Tenant-suspension enforcement: a suspended tenant locks out its members,
     # including on already-issued sessions. Platform admins bypass this so they
     # can always reach the admin console.
-    if not user.is_platform_admin:
-        tenant_id_claim = payload.get("tenant_id")
-        if tenant_id_claim:
-            tenant = await uow.tenants.get_by_id(UUID(tenant_id_claim))
-            if tenant is not None and tenant.status == TenantStatus.SUSPENDED:
-                raise AuthenticationError("Tenant is suspended", code="auth.tenant_suspended")
+    if not user.is_platform_admin and tenant_id_claim:
+        tenant = await uow.tenants.get_by_id(UUID(tenant_id_claim))
+        if tenant is not None and tenant.status == TenantStatus.SUSPENDED:
+            raise AuthenticationError("Tenant is suspended", code="auth.tenant_suspended")
     return user
 
 
