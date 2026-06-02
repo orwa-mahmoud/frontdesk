@@ -32,6 +32,14 @@ logger = structlog.get_logger()
 META_GRAPH_API = "https://graph.facebook.com/v23.0"
 
 _HTTP_TIMEOUT = 30.0
+_WHATSAPP_TEXT_LIMIT = 4096  # Meta rejects text bodies longer than this
+
+
+def _chunk_text(text: str, limit: int) -> list[str]:
+    """Split text into <=limit-char pieces (always at least one piece)."""
+    if len(text) <= limit:
+        return [text]
+    return [text[i : i + limit] for i in range(0, len(text), limit)]
 
 
 def _extract_first_message(raw_payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -149,13 +157,26 @@ class WhatsAppAdapter(ChannelAdapter):
             logger.error("whatsapp.media_url.error", error=str(e), media_id=media_id)
             return ""
 
-    @channel_send_retry()
     async def send_text(self, recipient: str, text: str) -> dict[str, Any] | None:
-        """Send a text message via Meta Cloud API with retry on transient failures."""
+        """Send a text message, splitting on WhatsApp's 4096-char body limit.
+
+        A reply longer than the limit would be rejected by Meta (400) and the
+        asker would get nothing; send it as ordered chunks instead. Retry is
+        per-chunk (on the helper) so a transient failure never re-sends earlier
+        chunks.
+        """
         if not self._phone_number_id or not self._access_token:
             logger.warning("whatsapp.send.no_credentials", recipient=recipient)
             return None
 
+        last_resp: dict[str, Any] | None = None
+        for chunk in _chunk_text(text, _WHATSAPP_TEXT_LIMIT):
+            last_resp = await self._send_text_chunk(recipient, chunk)
+        return last_resp
+
+    @channel_send_retry()
+    async def _send_text_chunk(self, recipient: str, text: str) -> dict[str, Any] | None:
+        """Send a single (already size-bounded) text message via Meta Cloud API."""
         to_number = recipient.lstrip("+")
         payload = {
             "messaging_product": "whatsapp",
