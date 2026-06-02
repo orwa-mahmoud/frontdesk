@@ -13,6 +13,7 @@ from typing import Any
 
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from src.domain.llm.ports import LLMClientPort
 from src.domain.llm.value_objects import (
@@ -22,6 +23,14 @@ from src.domain.llm.value_objects import (
     LLMToolCall,
     TokenUsage,
 )
+from src.infrastructure.llm.error_classifier import classify_llm_error
+
+_LLM_RETRY_ATTEMPTS = 3
+
+
+def _is_transient_llm_error(exc: BaseException) -> bool:
+    """Retry only transient provider errors (rate limit / timeout / outage)."""
+    return isinstance(exc, Exception) and classify_llm_error(exc).is_transient
 
 
 class LangChainLLMClient(LLMClientPort):
@@ -35,6 +44,12 @@ class LangChainLLMClient(LLMClientPort):
             kwargs["api_key"] = api_key
         self._chat = init_chat_model(model, **kwargs)
 
+    @retry(
+        retry=retry_if_exception(_is_transient_llm_error),
+        stop=stop_after_attempt(_LLM_RETRY_ATTEMPTS),
+        wait=wait_exponential(multiplier=0.5, max=4),
+        reraise=True,
+    )
     async def chat_with_tools(
         self,
         messages: Sequence[LLMMessage],
