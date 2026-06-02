@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { DEFAULT_PAGE_SIZE } from "../constants";
-import type { ExtraFilters, SortDirection } from "../types";
+import type { ExtraFilters, ExtraFilterValue, SortDirection } from "../types";
 
 const PARAM = {
   search: "q",
@@ -30,7 +30,7 @@ export interface TableUrlState {
   setLimit: (next: number) => void;
   setSort: (key: string | undefined, dir?: SortDirection) => void;
   setSearch: (next: string) => void;
-  setExtra: (key: string, value: string | string[] | number | undefined) => void;
+  setExtra: (key: string, value: ExtraFilterValue) => void;
   clearAll: () => void;
 }
 
@@ -50,6 +50,12 @@ function parseExtra(
   return extra;
 }
 
+function serializeExtraValue(value: ExtraFilterValue): string {
+  if (Array.isArray(value)) return value.join(",");
+  if (value === undefined) return "";
+  return String(value);
+}
+
 /** Reads/writes table state (search, sort, page, per-column filters) to the URL. */
 export function useTableUrlState(options: UseTableUrlStateOptions = {}): TableUrlState {
   const { defaults, numberExtraKeys = [], arrayExtraKeys = [] } = options;
@@ -63,11 +69,8 @@ export function useTableUrlState(options: UseTableUrlStateOptions = {}): TableUr
   const search = params.get(PARAM.search) ?? "";
   const sortBy = params.get(PARAM.sortBy) ?? defaults?.sortBy ?? undefined;
   const sortDirRaw = params.get(PARAM.sortDir);
-  const sortDir: SortDirection | undefined = sortBy
-    ? sortDirRaw === "desc"
-      ? "desc"
-      : (defaults?.sortDir ?? "asc")
-    : undefined;
+  let sortDir: SortDirection | undefined;
+  if (sortBy) sortDir = sortDirRaw === "desc" ? "desc" : (defaults?.sortDir ?? "asc");
 
   // Depend on serialized key lists, not array identity — callers commonly pass
   // inline arrays, which would otherwise make `extra` a new object every render.
@@ -124,13 +127,13 @@ export function useTableUrlState(options: UseTableUrlStateOptions = {}): TableUr
   const setSort = useCallback(
     (key: string | undefined, dir: SortDirection = "asc") =>
       update((p) => {
-        if (!key) {
-          p.delete(PARAM.sortBy);
-          p.delete(PARAM.sortDir);
-        } else {
+        if (key) {
           p.set(PARAM.sortBy, key);
           if (dir === "desc") p.set(PARAM.sortDir, "desc");
           else p.delete(PARAM.sortDir);
+        } else {
+          p.delete(PARAM.sortBy);
+          p.delete(PARAM.sortDir);
         }
         p.delete(PARAM.page);
       }),
@@ -138,10 +141,10 @@ export function useTableUrlState(options: UseTableUrlStateOptions = {}): TableUr
   );
 
   const setExtra = useCallback(
-    (key: string, value: string | string[] | number | undefined) =>
+    (key: string, value: ExtraFilterValue) =>
       update((p) => {
         const name = `${FILTER_PREFIX}${key}`;
-        const serialized = Array.isArray(value) ? value.join(",") : value === undefined ? "" : String(value);
+        const serialized = serializeExtraValue(value);
         if (serialized) p.set(name, serialized);
         else p.delete(name);
         p.delete(PARAM.page);
@@ -152,10 +155,12 @@ export function useTableUrlState(options: UseTableUrlStateOptions = {}): TableUr
   const clearAll = useCallback(
     () =>
       update((p) => {
-        for (const key of [...p.keys()]) {
-          if (key.startsWith(FILTER_PREFIX) || (Object.values(PARAM) as string[]).includes(key)) {
-            p.delete(key);
-          }
+        // Snapshot keys first — deleting from a live URLSearchParams iterator skips entries.
+        const removable = [...p.keys()].filter(
+          (key) => key.startsWith(FILTER_PREFIX) || (Object.values(PARAM) as string[]).includes(key),
+        );
+        for (const key of removable) {
+          p.delete(key);
         }
       }),
     [update],

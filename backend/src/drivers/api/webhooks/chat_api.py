@@ -24,11 +24,20 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=10_000)
 
 
+class ChatSourceOut(BaseModel):
+    document_id: str
+    snippet: str
+    score: float
+
+
 class ChatResponse(BaseModel):
     response: str
     thread_id: str
     escalated: bool
     request_id: str
+    sources: list[ChatSourceOut] = []
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 @router.post("")
@@ -56,4 +65,7 @@ async def chat(request: Request, req: ChatRequest, current_user: CurrentUser, uo
         thread_id=result.thread_id,
         escalated=result.escalated,
         request_id=result.request_id,
+        sources=[ChatSourceOut(document_id=s.document_id, snippet=s.snippet, score=s.score) for s in result.sources],
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
     )

@@ -129,6 +129,14 @@ describe("ChatTestPage", () => {
     await waitFor(() => expect(api.post).toHaveBeenCalled());
   });
 
+  it("shows a rate-limit message on HTTP 429", async () => {
+    vi.mocked(api.post).mockRejectedValue({ response: { status: 429 } });
+    render(wrap(<ChatTestPage />));
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "hi" } });
+    fireEvent.click(screen.getByText("Send"));
+    await waitFor(() => expect(screen.getByText(/sending messages too fast/i)).toBeInTheDocument());
+  });
+
   it("handles API error gracefully", async () => {
     vi.mocked(api.post).mockRejectedValue(new Error("fail"));
     render(wrap(<ChatTestPage />));
@@ -165,5 +173,161 @@ describe("ChatTestPage", () => {
     fireEvent.change(ta, { target: { value: "typing" } });
     fireEvent.keyDown(ta, { key: "a", shiftKey: false });
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("renders RAG sources with the document filename", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [{ id: "d1", filename: "guide.pdf" }] });
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        response: "From your guide",
+        thread_id: "t1",
+        escalated: false,
+        request_id: "r1",
+        sources: [{ document_id: "d1", snippet: "the answer text", score: 0.91 }],
+      },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "q" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => expect(screen.getByText("From your guide")).toBeInTheDocument());
+    expect(screen.getByText("Sources:")).toBeInTheDocument();
+    const sourceBadge = screen.getByText("guide.pdf");
+    expect(sourceBadge).toBeInTheDocument();
+
+    // Snippet is keyboard/tap accessible: revealed on click (not hover-only).
+    fireEvent.click(sourceBadge);
+    await waitFor(() => expect(screen.getByText("the answer text")).toBeInTheDocument());
+  });
+
+  it("falls back to a short id when the document filename is unknown", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        response: "answer",
+        thread_id: "t1",
+        escalated: false,
+        request_id: "r1",
+        sources: [{ document_id: "abcdef1234567890", snippet: "snip", score: 0.5 }],
+      },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "q" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => expect(screen.getByText("answer")).toBeInTheDocument());
+    expect(screen.getByText("abcdef12…")).toBeInTheDocument();
+  });
+
+  it("shows an escalated badge on the message", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { response: "esc", thread_id: "t1", escalated: true, request_id: "r1" },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "q" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => expect(screen.getByText("Escalated to inbox")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /view in inbox/i })).toHaveAttribute("href", "/inbox");
+  });
+
+  it("sends a suggested prompt from the empty state", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { response: "ans", thread_id: "t1", escalated: false, request_id: "r1" },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.click(screen.getByText("What are your opening hours?"));
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith("/api/v1/chat", { message: "What are your opening hours?" }),
+    );
+  });
+
+  it("previews the configured bot greeting in the empty state", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/api/v1/settings") {
+        return Promise.resolve({ data: { bot_name: "Aria", bot_welcome_message: "Hi! I'm Aria." } });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    render(wrap(<ChatTestPage />));
+    await waitFor(() => expect(screen.getByText("Hi! I'm Aria.")).toBeInTheDocument());
+    expect(screen.getByText("Aria")).toBeInTheDocument();
+  });
+
+  it("warns when some documents are still processing", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: [{ id: "d1", filename: "a.pdf", status: "ingesting" }],
+    });
+    render(wrap(<ChatTestPage />));
+    await waitFor(() => expect(screen.getByText(/still processing/i)).toBeInTheDocument());
+  });
+
+  it("nudges the owner to upload documents when none exist", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
+    render(wrap(<ChatTestPage />));
+    await waitFor(() => expect(screen.getByText("No documents uploaded yet")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: "Upload documents" })).toHaveAttribute("href", "/documents");
+  });
+
+  it("does not nudge to upload when documents exist", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [{ id: "d1", filename: "a.pdf" }] });
+    render(wrap(<ChatTestPage />));
+    // Give the documents query a tick to resolve, then assert the banner is absent.
+    await waitFor(() => expect(screen.getByText("Chat (test mode)")).toBeInTheDocument());
+    expect(screen.queryByText("No documents uploaded yet")).not.toBeInTheDocument();
+  });
+
+  it("shows the response latency on the AI message", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { response: "timed reply", thread_id: "t1", escalated: false, request_id: "r1" },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "q" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => expect(screen.getByText("timed reply")).toBeInTheDocument());
+    // A latency label like "0.00s" / "1.2s" is rendered next to the AI label.
+    expect(screen.getByText(/^\d+\.\d+s$/)).toBeInTheDocument();
+  });
+
+  it("shows token usage when the response includes token counts", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        response: "counted reply",
+        thread_id: "t1",
+        escalated: false,
+        request_id: "r1",
+        input_tokens: 120,
+        output_tokens: 30,
+      },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "q" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => expect(screen.getByText("counted reply")).toBeInTheDocument());
+    expect(screen.getByText(/150 tokens/)).toBeInTheDocument();
+  });
+
+  it("resets the conversation", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { response: "reply", thread_id: "t1", escalated: false, request_id: "r1" },
+    });
+    render(wrap(<ChatTestPage />));
+
+    fireEvent.change(screen.getByPlaceholderText("Type a message..."), { target: { value: "hi" } });
+    fireEvent.click(screen.getByText("Send"));
+    await waitFor(() => expect(screen.getByText("reply")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("New conversation"));
+    expect(screen.queryByText("reply")).not.toBeInTheDocument();
+    expect(screen.getByText(/send a message to test/i)).toBeInTheDocument();
   });
 });

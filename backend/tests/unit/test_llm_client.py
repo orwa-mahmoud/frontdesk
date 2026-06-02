@@ -190,3 +190,39 @@ async def test_chat_with_tools_binds_params(mock_init: MagicMock) -> None:
     mock_chat.bind.assert_called_once_with(max_tokens=500, temperature=0.7)
     bound_chat.bind_tools.assert_called_once()
     assert result.text == "Ok"
+
+
+@pytest.mark.asyncio
+@patch("src.infrastructure.llm.client.init_chat_model")
+async def test_chat_with_tools_retries_transient_error(mock_init: MagicMock) -> None:
+    ok = MagicMock()
+    ok.content = "recovered"
+    ok.tool_calls = []
+    ok.usage_metadata = {"input_tokens": 1, "output_tokens": 1}
+    mock_chat = AsyncMock()
+    mock_chat.ainvoke = AsyncMock(side_effect=[RuntimeError("Rate limit exceeded"), ok])
+    mock_init.return_value = mock_chat
+
+    from src.infrastructure.llm.client import LangChainLLMClient
+
+    client = LangChainLLMClient(provider="openai", model="gpt-4o", api_key="sk-test")
+    result = await client.chat_with_tools([LLMMessage(role=LLMMessageRole.USER, content="hi")])
+
+    assert result.text == "recovered"
+    assert mock_chat.ainvoke.await_count == 2  # transient error retried once
+
+
+@pytest.mark.asyncio
+@patch("src.infrastructure.llm.client.init_chat_model")
+async def test_chat_with_tools_does_not_retry_permanent_error(mock_init: MagicMock) -> None:
+    mock_chat = AsyncMock()
+    mock_chat.ainvoke = AsyncMock(side_effect=RuntimeError("Invalid API key"))
+    mock_init.return_value = mock_chat
+
+    from src.infrastructure.llm.client import LangChainLLMClient
+
+    client = LangChainLLMClient(provider="openai", model="gpt-4o", api_key="sk-test")
+    with pytest.raises(RuntimeError, match="Invalid API key"):
+        await client.chat_with_tools([LLMMessage(role=LLMMessageRole.USER, content="hi")])
+
+    assert mock_chat.ainvoke.await_count == 1  # auth error is permanent — no retry

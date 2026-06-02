@@ -1,8 +1,10 @@
 """Per-tenant LLM client factory with in-memory cache + TTL.
 
-Builds and caches LLM clients per tenant_id. Cache entries expire after
-1 hour. When tenant config is updated, the cache is invalidated via
-the event bus (TenantConfigUpdated handler calls invalidate()).
+Builds and caches LLM clients per tenant_id (one client = one
+provider/model/api_key). Cache entries expire after 1 hour. When a tenant
+updates its LLM config, the settings route calls `invalidate()` (via
+`invalidate_tenant_llm_client` in the gateway) so the next chat rebuilds the
+client with the new credentials instead of serving the stale cached one.
 """
 
 from __future__ import annotations
@@ -54,9 +56,11 @@ class TenantLLMClientFactory:
             return client
 
     def invalidate(self, tenant_id: UUID) -> None:
-        removed = self._cache.pop(str(tenant_id), None)
+        with self._lock:
+            removed = self._cache.pop(str(tenant_id), None)
         if removed:
             logger.info("tenant_llm_factory.invalidated", tenant_id=str(tenant_id))
 
     def clear(self) -> None:
-        self._cache.clear()
+        with self._lock:
+            self._cache.clear()

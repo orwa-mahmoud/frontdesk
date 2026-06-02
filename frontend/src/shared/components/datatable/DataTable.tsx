@@ -106,7 +106,7 @@ export function DataTable<TRow>({
         <Group justify="space-between">
           <span>{t("common.retry")}</span>
           {source.refetch ? (
-            <Button size="xs" variant="light" color="red" onClick={() => void source.refetch?.()}>
+            <Button size="xs" variant="light" color="red" onClick={() => source.refetch?.()}>
               {t("table.retryAction")}
             </Button>
           ) : null}

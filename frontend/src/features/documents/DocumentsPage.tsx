@@ -1,15 +1,25 @@
 import { Badge, Box, Button, FileButton, Group, Stack, Text, Title } from "@mantine/core";
-import { IconCircleCheck, IconFileText, IconTrash, IconUpload } from "@tabler/icons-react";
+import { notifications } from "@mantine/notifications";
+import {
+  IconAlertCircle,
+  IconCircleCheck,
+  IconFileText,
+  IconMessageCircle,
+  IconTrash,
+  IconUpload,
+} from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { api } from "@core/api/client";
 import {
   DataTable,
   SelectFilter,
   useFrontendData,
+  type CellProps,
   type ColumnDef,
   type RowAction,
 } from "@shared/components/datatable";
@@ -37,7 +47,7 @@ const STATUS_COLOR: Record<string, string> = {
 const STATUSES = ["uploaded", "ingesting", "ready", "failed"] as const;
 
 async function listDocuments(): Promise<DocumentSummary[]> {
-  const { data } = await api.get<DocumentSummary[]>("/api/v1/documents");
+  const { data } = await api.get<DocumentSummary[]>("/api/v1/documents", { params: { limit: 500 } });
   return data;
 }
 
@@ -64,15 +74,82 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+const PROCESSING_STATUSES = new Set(["uploaded", "ingesting"]);
+
+// Cell renderers are module-level components (stable identity; keeps them out of
+// the page component body per Sonar S6478).
+function FileCell({ row }: Readonly<CellProps<DocumentSummary>>) {
+  return (
+    <Group gap="xs" wrap="nowrap">
+      <IconCircleCheck
+        size={14}
+        color={row.status === "ready" ? "var(--mantine-color-teal-6)" : "var(--mantine-color-gray-4)"}
+      />
+      <Text size="sm">{row.filename}</Text>
+    </Group>
+  );
+}
+
+function StatusCell({ row }: Readonly<CellProps<DocumentSummary>>) {
+  const badge = (
+    <Badge color={STATUS_COLOR[row.status] ?? "gray"} variant="light">
+      {row.status}
+    </Badge>
+  );
+  if (row.status === "failed" && row.error) {
+    return (
+      <Group gap={6} wrap="nowrap" align="center">
+        <IconAlertCircle size={14} color="var(--mantine-color-red-6)" />
+        {badge}
+        <Text size="xs" c="red" lineClamp={1} maw={220} title={row.error}>
+          {row.error}
+        </Text>
+      </Group>
+    );
+  }
+  return badge;
+}
+
+function ChunkCountCell({ row }: Readonly<CellProps<DocumentSummary>>) {
+  return <Text size="sm">{row.chunk_count}</Text>;
+}
+
+function SizeCell({ row }: Readonly<CellProps<DocumentSummary>>) {
+  return <Text size="sm">{formatBytes(row.size_bytes)}</Text>;
+}
+
+function UploadedCell({ row }: Readonly<CellProps<DocumentSummary>>) {
+  return (
+    <Text size="sm" c="dimmed">
+      {dayjs(row.created_at).format("MMM D, HH:mm")}
+    </Text>
+  );
+}
+
 export function DocumentsPage() {
   const { t } = useTranslation();
-  const documentsQuery = useQuery({ queryKey: ["documents"], queryFn: listDocuments });
+  // Poll while any document is still processing so it flips to "ready"
+  // (or "failed") in the UI without a manual refresh.
+  const documentsQuery = useQuery({
+    queryKey: ["documents"],
+    queryFn: listDocuments,
+    refetchInterval: (query) =>
+      query.state.data?.some((d) => PROCESSING_STATUSES.has(d.status)) ? 4000 : false,
+  });
 
   const uploadMutation = useMutationWithNotification({
     mutationFn: uploadDocument,
     successMessage: t("documents.uploaded"),
-    errorMessage: t("documents.uploadFailed"),
     invalidateKeys: [["documents"]],
+    // A failed ingestion is still persisted as a FAILED document — refetch so the
+    // owner sees it (with the error reason) right away, not just the toast.
+    invalidateOnError: true,
+    // Status-aware error: a 413 means the file exceeded the size cap, not a bad type.
+    onError: (err) => {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const message = status === 413 ? t("documents.uploadTooLarge") : t("documents.uploadFailed");
+      notifications.show({ color: "red", message });
+    },
   });
 
   const deleteMutation = useMutationWithNotification({
@@ -89,49 +166,29 @@ export function DocumentsPage() {
         header: t("documents.colFile"),
         sortable: true,
         sortValue: (d) => d.filename,
-        accessor: (d) => (
-          <Group gap="xs" wrap="nowrap">
-            <IconCircleCheck
-              size={14}
-              color={d.status === "ready" ? "var(--mantine-color-teal-6)" : "var(--mantine-color-gray-4)"}
-            />
-            <Text size="sm">{d.filename}</Text>
-          </Group>
-        ),
+        Cell: FileCell,
       },
-      {
-        key: "status",
-        header: t("documents.colStatus"),
-        accessor: (d) => (
-          <Badge color={STATUS_COLOR[d.status] ?? "gray"} variant="light">
-            {d.status}
-          </Badge>
-        ),
-      },
+      { key: "status", header: t("documents.colStatus"), Cell: StatusCell },
       {
         key: "chunk_count",
         header: t("documents.colChunks"),
         sortable: true,
         sortValue: (d) => d.chunk_count,
-        accessor: (d) => <Text size="sm">{d.chunk_count}</Text>,
+        Cell: ChunkCountCell,
       },
       {
         key: "size_bytes",
         header: t("documents.colSize"),
         sortable: true,
         sortValue: (d) => d.size_bytes,
-        accessor: (d) => <Text size="sm">{formatBytes(d.size_bytes)}</Text>,
+        Cell: SizeCell,
       },
       {
         key: "created_at",
         header: t("documents.colUploaded"),
         sortable: true,
         sortValue: (d) => d.created_at,
-        accessor: (d) => (
-          <Text size="sm" c="dimmed">
-            {dayjs(d.created_at).format("MMM D, HH:mm")}
-          </Text>
-        ),
+        Cell: UploadedCell,
       },
     ],
     [t],
@@ -184,16 +241,27 @@ export function DocumentsPage() {
         tableLabel={t("documents.title")}
         searchPlaceholder={t("documents.searchPlaceholder")}
         toolbar={
-          <FileButton
-            onChange={(file) => file && uploadMutation.mutate(file)}
-            accept=".pdf,.md,.markdown,.txt,.docx"
-          >
-            {(props) => (
-              <Button {...props} leftSection={<IconUpload size={18} />} loading={uploadMutation.isPending}>
-                {t("documents.upload")}
-              </Button>
-            )}
-          </FileButton>
+          <Group gap="sm">
+            <Button
+              component={Link}
+              to="/chat"
+              variant="light"
+              color="coral"
+              leftSection={<IconMessageCircle size={18} />}
+            >
+              {t("documents.testInChat")}
+            </Button>
+            <FileButton
+              onChange={(file) => file && uploadMutation.mutate(file)}
+              accept=".pdf,.md,.markdown,.txt,.docx"
+            >
+              {(props) => (
+                <Button {...props} leftSection={<IconUpload size={18} />} loading={uploadMutation.isPending}>
+                  {t("documents.upload")}
+                </Button>
+              )}
+            </FileButton>
+          </Group>
         }
         emptyState={
           <EmptyState

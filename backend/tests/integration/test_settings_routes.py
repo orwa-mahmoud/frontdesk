@@ -32,6 +32,33 @@ async def test_update_llm(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_llm_invalidates_cached_client(client: AsyncClient) -> None:
+    """Updating LLM config must drop the cached client so the change takes effect."""
+    from uuid import UUID
+
+    from src.ai.gateway import _get_llm_factory
+    from src.domain.tenant_config.entities import TenantConfig
+
+    token, _, tenant_id = await register_and_token(client)
+
+    # Prime the per-tenant client cache as a live chat would.
+    factory = _get_llm_factory()
+    cfg = TenantConfig.create_default(tenant_id=UUID(tenant_id))
+    cfg.llm_api_key = "sk-old-key-12345678"
+    factory.get_or_build(UUID(tenant_id), cfg)
+    assert tenant_id in factory._cache
+
+    resp = await client.put(
+        "/api/v1/settings/llm",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"model": "gpt-4o", "max_tokens": 2048},
+    )
+    assert resp.status_code == 200
+    # The stale client was evicted; the next chat rebuilds with the new config.
+    assert tenant_id not in factory._cache
+
+
+@pytest.mark.asyncio
 async def test_update_embedding(client: AsyncClient) -> None:
     token, _, _ = await register_and_token(client)
     resp = await client.put(

@@ -31,8 +31,8 @@ export function useBackendData<TRow, TParams extends TableQueryParams, TPage = P
   const { usePaginatedQuery, selectPage, baseParams, paginationMode = "auto" } = options;
 
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY) ?? false;
-  const resolvedMode: "infinite" | "paged" =
-    paginationMode === "auto" ? (isMobile ? "infinite" : "paged") : paginationMode;
+  const autoMode: "infinite" | "paged" = isMobile ? "infinite" : "paged";
+  const resolvedMode: "infinite" | "paged" = paginationMode === "auto" ? autoMode : paginationMode;
   const paged = resolvedMode === "paged";
 
   const state = useTableUrlState(options.urlState);
@@ -57,7 +57,7 @@ export function useBackendData<TRow, TParams extends TableQueryParams, TPage = P
     if (!pages || pages.length === 0) return { rows: [] as readonly TRow[], total: 0 };
     const project = selector;
     if (paged) {
-      const lastPage = pages[pages.length - 1]!;
+      const lastPage = pages.at(-1)!;
       const projected = project(lastPage);
       return { rows: projected.items, total: projected.total ?? projected.items.length };
     }
@@ -72,7 +72,9 @@ export function useBackendData<TRow, TParams extends TableQueryParams, TPage = P
   }, [query.data, paged, selector]);
 
   const fetchNextPage = useCallback(() => {
-    if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
+    if (query.hasNextPage && !query.isFetchingNextPage) {
+      query.fetchNextPage().catch(() => undefined);
+    }
   }, [query]);
 
   return {

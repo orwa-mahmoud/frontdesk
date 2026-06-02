@@ -58,7 +58,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
       },
       logout: () => {
         setUser(null);
-        void authApi.logout();
+        authApi.logout().catch(() => undefined);
       },
     }),
     [user, loading, loadCurrentUser],

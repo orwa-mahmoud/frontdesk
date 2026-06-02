@@ -70,7 +70,23 @@
     "send": "Send",
     "sendAria": "Send message",
     "escalated": "Question escalated to the owner inbox.",
-    "error": "Could not get a response. Check Settings → LLM."
+    "error": "Could not get a response. Check Settings → LLM.",
+    "reset": "New conversation",
+    "sources": "Sources",
+    "escalatedBadge": "Escalated to inbox",
+    "suggestionsLabel": "Try asking:",
+    "suggest1": "What are your opening hours?",
+    "suggest2": "Where are you located?",
+    "suggest3": "Do you offer refunds?",
+    "thinking": "Thinking…",
+    "secondsSuffix": "s",
+    "noDocsTitle": "No documents uploaded yet",
+    "noDocsBody": "The AI will answer from general knowledge only. Upload files so it can ground replies in your content and cite sources here.",
+    "noDocsCta": "Upload documents",
+    "tokens": "{{n}} tokens",
+    "viewInInbox": "View in inbox →",
+    "docsProcessing": "{{n}} document(s) are still processing and won't be searchable yet.",
+    "rateLimited": "You're sending messages too fast — please wait a moment and try again."
   },
   "conversations": {
     "title": "Conversations",
@@ -84,13 +100,20 @@
     "colCreated": "Created",
     "statMessagesToday": "Messages today",
     "statActive": "Active conversations",
-    "statEscalated": "Escalated today"
+    "statEscalated": "Escalated today",
+    "view": "View transcript",
+    "transcript": "Conversation transcript",
+    "noMessages": "No messages in this conversation yet.",
+    "loadMessagesError": "Could not load the transcript.",
+    "visitor": "Visitor",
+    "assistant": "AI"
   },
   "documents": {
     "title": "Knowledge base",
     "subtitle": "Upload PDFs, Markdown, or DOCX. The AI grounds its answers in these documents using hybrid (vector + BM25) retrieval over pgvector.",
     "searchPlaceholder": "Search files",
     "upload": "Upload file",
+    "testInChat": "Test in chat",
     "uploaded": "Document ingested.",
     "uploadFailed": "Upload failed. Check file type (PDF, DOCX, Markdown, plain text).",
     "deleted": "Document removed.",
@@ -104,7 +127,8 @@
     "colChunks": "Chunks",
     "colSize": "Size",
     "colUploaded": "Uploaded",
-    "filterStatus": "Status"
+    "filterStatus": "Status",
+    "uploadTooLarge": "File is too large. The maximum upload size is 25 MB."
   },
   "inbox": {
     "title": "Inbox",
@@ -123,6 +147,7 @@
     "yourReply": "Your reply",
     "reply": "Reply",
     "close": "Close",
+    "confirmCloseTitle": "Close question",
     "confirmClose": "Are you sure you want to close this question?",
     "replyModalTitle": "Reply to question",
     "replyPlaceholder": "Type the reply you'd like the AI to relay back to the asker…",
@@ -181,6 +206,8 @@
     "appSecret": "App Secret",
     "appSecretNotSet": "Not set — required for webhook signature verification",
     "webhookUrl": "Webhook URL:",
+    "copy": "Copy",
+    "copied": "Copied",
     "saveWhatsapp": "Save WhatsApp config",
     "botToken": "Bot Token",
     "botTokenNotSet": "Not set — get one from @BotFather",

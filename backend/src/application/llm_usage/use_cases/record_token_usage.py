@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import structlog
+
 from src.application.llm_usage.commands import RecordTokenUsage
 from src.application.shared.unit_of_work import UnitOfWork
 from src.domain.llm_usage.entities import TokenUsage
+from src.domain.llm_usage.pricing import get_model_pricing
+
+logger = structlog.get_logger()
 
 
 class RecordTokenUsageUseCase:
@@ -12,6 +17,12 @@ class RecordTokenUsageUseCase:
         self._uow = uow
 
     async def execute(self, cmd: RecordTokenUsage) -> None:
+        if get_model_pricing(cmd.model) is None:
+            # Cost is recorded as $0 for models absent from the pricing table — warn
+            # so the silent under-count is visible and the rate can be added (the
+            # model field is owner-editable free text).
+            logger.warning("llm_usage.unknown_model_pricing", model=cmd.model, provider=cmd.provider)
+
         usage = TokenUsage.record(
             tenant_id=cmd.tenant_id,
             provider=cmd.provider,

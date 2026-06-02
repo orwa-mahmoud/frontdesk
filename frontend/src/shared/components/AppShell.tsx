@@ -138,7 +138,10 @@ export function ProtectedShell({ children }: Readonly<{ children: ReactNode }>) 
         </ScrollArea>
       </MantineAppShell.Navbar>
 
-      <MantineAppShell.Main id="main-content">{children}</MantineAppShell.Main>
+      {/* tabIndex=-1 so the skip link moves keyboard focus here, not just scroll. */}
+      <MantineAppShell.Main id="main-content" tabIndex={-1}>
+        {children}
+      </MantineAppShell.Main>
     </MantineAppShell>
   );
 }

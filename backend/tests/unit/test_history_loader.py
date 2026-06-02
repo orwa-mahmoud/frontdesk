@@ -52,8 +52,10 @@ def test_format_gap_days() -> None:
 
 
 def test_staleness_hint_injected_when_stale() -> None:
-    old_time = datetime.now(UTC) - STALE_THRESHOLD - timedelta(minutes=5)
-    dtos = [_make_dto(created_at=old_time)]
+    # A long gap between the previous message and the current (newest) one.
+    now = datetime.now(UTC)
+    previous = now - STALE_THRESHOLD - timedelta(minutes=5)
+    dtos = [_make_dto(created_at=previous), _make_dto(created_at=now)]
     messages: list[LLMMessage] = [LLMMessage(role=LLMMessageRole.USER, content="hi")]
     _inject_staleness_hint(messages, dtos)
     assert len(messages) == 2
@@ -62,8 +64,18 @@ def test_staleness_hint_injected_when_stale() -> None:
 
 
 def test_staleness_hint_not_injected_when_recent() -> None:
-    recent = datetime.now(UTC) - timedelta(minutes=5)
-    dtos = [_make_dto(created_at=recent)]
+    # Previous message was only minutes before the current one — not stale.
+    now = datetime.now(UTC)
+    previous = now - timedelta(minutes=5)
+    dtos = [_make_dto(created_at=previous), _make_dto(created_at=now)]
+    messages: list[LLMMessage] = [LLMMessage(role=LLMMessageRole.USER, content="hi")]
+    _inject_staleness_hint(messages, dtos)
+    assert len(messages) == 1
+
+
+def test_staleness_hint_not_injected_on_first_message() -> None:
+    # Only the current message exists (brand-new thread) — nothing to compare to.
+    dtos = [_make_dto(created_at=datetime.now(UTC))]
     messages: list[LLMMessage] = [LLMMessage(role=LLMMessageRole.USER, content="hi")]
     _inject_staleness_hint(messages, dtos)
     assert len(messages) == 1

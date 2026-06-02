@@ -4,6 +4,7 @@ import { useRef } from "react";
 
 import { useStaggerIn } from "@shared/animations/stagger";
 
+import { renderCell } from "./renderCell";
 import type { ColumnDef, RowAction, SortDirection } from "./types";
 
 export interface DataTableDesktopProps<TRow> {
@@ -19,12 +20,17 @@ export interface DataTableDesktopProps<TRow> {
   readonly onRunAction: (action: RowAction<TRow>, row: TRow) => void;
 }
 
-function renderCell<TRow>(column: ColumnDef<TRow>, row: TRow) {
-  if (column.Cell) return <column.Cell row={row} />;
-  if (column.accessor) return column.accessor(row);
-  const value =
-    typeof row === "object" && row !== null ? (row as Record<string, unknown>)[column.key] : undefined;
-  return value === null || value === undefined ? "" : String(value);
+function ariaSortFor(
+  sorted: boolean,
+  dir: SortDirection | undefined,
+): "ascending" | "descending" | undefined {
+  if (!sorted) return undefined;
+  return dir === "desc" ? "descending" : "ascending";
+}
+
+function SortIcon({ sorted, dir }: Readonly<{ sorted: boolean; dir: SortDirection | undefined }>) {
+  if (!sorted) return <IconSelector size={14} opacity={0.5} />;
+  return dir === "desc" ? <IconChevronDown size={14} /> : <IconChevronUp size={14} />;
 }
 
 export function DataTableDesktop<TRow>({
@@ -52,7 +58,7 @@ export function DataTableDesktop<TRow>({
           <Table.Tr>
             {visibleColumns.map((col) => {
               const sorted = sortBy === col.key;
-              const ariaSort = sorted ? (sortDir === "desc" ? "descending" : "ascending") : undefined;
+              const ariaSort = ariaSortFor(sorted, sortDir);
               return (
                 <Table.Th
                   key={col.key}
@@ -67,15 +73,7 @@ export function DataTableDesktop<TRow>({
                       <Text span size="sm" fw={600}>
                         {col.header}
                       </Text>
-                      {sorted ? (
-                        sortDir === "desc" ? (
-                          <IconChevronDown size={14} />
-                        ) : (
-                          <IconChevronUp size={14} />
-                        )
-                      ) : (
-                        <IconSelector size={14} opacity={0.5} />
-                      )}
+                      <SortIcon sorted={sorted} dir={sortDir} />
                     </UnstyledButton>
                   ) : (
                     col.header

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { MantineProvider } from "@mantine/core";
 import { AuthContext, type AuthContextValue } from "@auth/context";
@@ -94,6 +94,14 @@ describe("ProtectedShell", () => {
     expect(screen.getByText("Page")).toBeInTheDocument();
   });
 
+  it("exposes a focusable main landmark the skip link can target", () => {
+    const { container } = renderShell(USER_WITH_NAME);
+    const main = container.querySelector("#main-content");
+    expect(main).not.toBeNull();
+    // tabIndex=-1 lets the skip link move keyboard focus, not just scroll.
+    expect(main).toHaveAttribute("tabindex", "-1");
+  });
+
   it("marks non-root nav as active on matching path", () => {
     renderShell(USER_WITH_NAME, "/documents");
     const docsLink = screen.getByText("Documents").closest("a");
@@ -110,5 +118,32 @@ describe("ProtectedShell", () => {
     } as unknown as typeof USER_WITH_NAME;
     renderShell(minimalUser);
     expect(screen.getByText("?")).toBeInTheDocument();
+  });
+
+  it("reveals the skip-to-content link on focus and hides it on blur", () => {
+    renderShell(USER_WITH_NAME);
+    const link = screen.getByText("Skip to content");
+    expect(link).toHaveStyle({ position: "absolute" });
+    fireEvent.focus(link);
+    expect(link).toHaveStyle({ position: "fixed" });
+    fireEvent.blur(link);
+    expect(link).toHaveStyle({ position: "absolute" });
+  });
+
+  it("calls logout when sign out is clicked", () => {
+    const logout = vi.fn();
+    render(
+      <MantineProvider>
+        <MemoryRouter>
+          <AuthContext.Provider value={{ ...base, user: USER_WITH_NAME, logout }}>
+            <ProtectedShell>
+              <div>Page</div>
+            </ProtectedShell>
+          </AuthContext.Provider>
+        </MemoryRouter>
+      </MantineProvider>,
+    );
+    fireEvent.click(screen.getByLabelText("Sign out"));
+    expect(logout).toHaveBeenCalled();
   });
 });

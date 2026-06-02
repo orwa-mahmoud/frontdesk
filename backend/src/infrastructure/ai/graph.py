@@ -37,6 +37,29 @@ logger = structlog.get_logger()
 
 _MAX_ITERATIONS = 5
 
+# Sent to the asker when the agent loop ends without a usable reply — e.g. the
+# model hit the iteration cap while still requesting tools (its last message
+# carries tool calls and empty content). Better a graceful message than a blank.
+_FALLBACK_REPLY = (
+    "I'm sorry — I couldn't put together a complete answer just now. "
+    "Could you rephrase your question, or I can pass this to a team member?"
+)
+
+
+def _final_reply_text(messages: Sequence[BaseMessage]) -> str:
+    """Extract the assistant's final reply text, with a safe fallback.
+
+    The loop can terminate on the iteration cap while the last LLM message
+    still carries tool calls and empty content; returning that empty string
+    would send the asker a blank reply. Fall back to a graceful message.
+    """
+    if not messages:
+        return _FALLBACK_REPLY
+    last = messages[-1]
+    content = last.content if isinstance(last, AIMessage) else str(last.content)
+    text = content if isinstance(content, str) else str(content)
+    return text if text.strip() else _FALLBACK_REPLY
+
 
 class AgentState(TypedDict):
     messages: list[BaseMessage]
@@ -74,16 +97,22 @@ async def _execute_tools_node(
         args = tc.get("args") or {}
         logger.info("graph.tool_call", tool=tool_name, iteration=state["iteration"])
 
-        result = await _dispatch_tool(
-            tool_name=tool_name,
-            arguments=args,
-            tenant_id=tenant_id,
-            channel=channel,
-            conversation_id=conversation_id,
-            contact_id=contact_id,
-            retriever=retriever,
-            uow=uow,
-        )
+        try:
+            result = await _dispatch_tool(
+                tool_name=tool_name,
+                arguments=args,
+                tenant_id=tenant_id,
+                channel=channel,
+                conversation_id=conversation_id,
+                contact_id=contact_id,
+                retriever=retriever,
+                uow=uow,
+            )
+        except Exception:
+            # A single tool failure must not crash the whole turn — surface it as a
+            # result so the model can recover (apologize, escalate, or answer anyway).
+            logger.warning("graph.tool_error", tool=tool_name, iteration=state["iteration"], exc_info=True)
+            result = {"error": f"The {tool_name} tool failed and returned no result."}
         result_str = json.dumps(result, default=str)
         new_messages.append(ToolMessage(content=result_str, tool_call_id=tc.get("id", "")))
         new_tool_calls.append(
@@ -116,6 +145,7 @@ def build_agent_graph(
     retriever: RetrieverPort,
     uow: UnitOfWork,
     max_tokens: int = 1024,
+    temperature: float | None = None,
 ) -> StateGraph[AgentState]:
     """Build a fresh (stateless) LangGraph for one agent turn."""
 
@@ -126,6 +156,7 @@ def build_agent_graph(
             _from_lc_messages(state["messages"]),
             tools=tool_schemas if tool_schemas else None,
             max_tokens=max_tokens,
+            temperature=temperature,
         )
         ai_msg = _to_ai_message(response.text, response.tool_calls)
         return {
@@ -176,11 +207,8 @@ async def run_graph(
 
     final_state = await compiled.ainvoke(initial_state)
 
-    last_msg = final_state["messages"][-1]
-    text = last_msg.content if isinstance(last_msg, AIMessage) else str(last_msg.content)
-
     return AgentLoopResult(
-        text=text if isinstance(text, str) else str(text),
+        text=_final_reply_text(final_state["messages"]),
         tool_calls=final_state["tool_calls_made"],
         input_tokens=final_state["total_input_tokens"],
         output_tokens=final_state["total_output_tokens"],

@@ -19,7 +19,7 @@ export function useLanguage(): UseLanguageReturn {
     : "en";
   const setLanguage = useCallback(
     (next: Language) => {
-      void i18n.changeLanguage(next);
+      i18n.changeLanguage(next).catch(() => undefined);
     },
     [i18n],
   );
