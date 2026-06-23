@@ -41,3 +41,11 @@ def test_update_llm_partial() -> None:
     c.update_llm(api_key="new-key")
     assert c.llm_api_key == "new-key"
     assert c.llm_model == old_model  # unchanged
+
+
+def test_rerank_model_defaults_and_updates() -> None:
+    c = TenantConfig.create_default(tenant_id=uuid4())
+    assert c.rerank_model == "gpt-4o-mini"  # cheap default
+    c.update_llm(rerank_model="gpt-4.1-nano")
+    assert c.rerank_model == "gpt-4.1-nano"
+    assert c.llm_model == "gpt-4o-mini"  # answer model independent of rerank model

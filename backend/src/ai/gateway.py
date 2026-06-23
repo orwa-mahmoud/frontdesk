@@ -41,6 +41,7 @@ from src.application.llm_usage.use_cases.record_token_usage import RecordTokenUs
 from src.application.shared.unit_of_work import UnitOfWork
 from src.config.settings import get_settings
 from src.domain.conversations.value_objects import ConversationRole
+from src.domain.llm.ports import LLMClientPort
 from src.domain.llm.value_objects import LLMMessage, LLMMessageRole
 from src.domain.shared.exceptions import InvalidOperationError
 from src.domain.tenant_config.entities import TenantConfig
@@ -141,14 +142,7 @@ async def chat_with_agent(inp: ChatInput, *, uow: UnitOfWork) -> ChatResult:
 
     # ── 4. Build LLM client + retriever from tenant config ────────
 
-    llm = _get_llm_factory().get_or_build(inp.tenant_id, tenant_config)
-    embedding_key = tenant_config.embedding_api_key or tenant_config.llm_api_key
-    embedder = OpenAIEmbedder(
-        api_key=embedding_key,
-        model=tenant_config.embedding_model,
-        dimensions=1536,
-    )
-    retriever = HybridRetriever(session=uow._session, embedder=embedder, reranker=LLMReranker(llm))
+    llm, retriever = _build_llm_and_retriever(inp.tenant_id, tenant_config, uow)
 
     # ── 5. Acquire thread lock + run LangGraph agent ───────────────
     lock = await _acquire_thread_lock(thread_id)
@@ -337,6 +331,24 @@ def _get_llm_factory() -> TenantLLMClientFactory:
     if _Singletons.llm_factory is None:
         _Singletons.llm_factory = TenantLLMClientFactory()
     return _Singletons.llm_factory
+
+
+def _build_llm_and_retriever(
+    tenant_id: uuid.UUID, config: TenantConfig, uow: UnitOfWork
+) -> tuple[LLMClientPort, HybridRetriever]:
+    """Answer-model client + the hybrid retriever. Reranking runs on a cheap,
+    dedicated model so each turn pays answer-model rates for one call (the reply),
+    not two."""
+    factory = _get_llm_factory()
+    llm = factory.get_or_build(tenant_id, config)
+    rerank_llm = factory.get_or_build_reranker(tenant_id, config)
+    embedder = OpenAIEmbedder(
+        api_key=config.embedding_api_key or config.llm_api_key,
+        model=config.embedding_model,
+        dimensions=1536,
+    )
+    retriever = HybridRetriever(session=uow._session, embedder=embedder, reranker=LLMReranker(rerank_llm))
+    return llm, retriever
 
 
 def invalidate_tenant_llm_client(tenant_id: uuid.UUID) -> None:

@@ -240,7 +240,9 @@ Value objects in `domain/rag/value_objects.py`: `TextChunk(index, content)` and 
 
 ## Reranking
 
-The retriever supports an optional `RerankerPort` (Step 4, after RRF fusion). A `PassThroughReranker` (no-op) is used by default. To enable real reranking, implement `RerankerPort` (e.g. Cohere Rerank, cross-encoder) and inject it when constructing the `HybridRetriever`.
+The retriever takes an optional `RerankerPort` (Step 4, after RRF fusion). In production the gateway injects `LLMReranker`, which asks an LLM to reorder the candidate pool (`top_k * 3`) by relevance and keeps the best `top_k`. It is robust by construction: on any error or unparseable reply it falls back to the hybrid order, and it never drops a candidate the model omits — so it can only improve ranking, never degrade it. When no reranker is injected (e.g. ad-hoc use of `HybridRetriever`), the hybrid order is kept as-is.
+
+**Dedicated rerank model.** Reranking runs on a per-tenant `rerank_model` (TenantConfig, default `gpt-4o-mini`), built by `TenantLLMClientFactory.get_or_build_reranker` — same provider/key as the answer model but a small, cheap model. Sorting ~24 short snippets is an easy judgment, so this keeps each chat turn to **one** call on the (expensive) answer model instead of two. The owner sets it under Settings → LLM, and `eval/db_eval.py` reads the same field so eval and prod rerank with the same model.
 
 ---
 

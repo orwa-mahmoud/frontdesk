@@ -33,6 +33,7 @@ from eval.types import QuestionOutcome, ScoredDoc
 from src.infrastructure.llm.client import LangChainLLMClient
 from src.infrastructure.persistence.postgres.database import async_session_factory
 from src.infrastructure.persistence.postgres.models.document import DocumentModel
+from src.infrastructure.persistence.postgres.repositories.tenant_config_repo import PostgresTenantConfigRepository
 from src.infrastructure.rag.embedder import OpenAIEmbedder
 from src.infrastructure.rag.reranker import LLMReranker
 from src.infrastructure.rag.retriever import HybridRetriever
@@ -41,15 +42,19 @@ _HERE = Path(__file__).parent
 _TOP_K = 8
 _ESCALATE_THRESHOLD = 0.25
 _EMBEDDING_MODEL = "text-embedding-3-large"
-_RERANK_MODEL = "gpt-4o-mini"
+_RERANK_MODEL_FALLBACK = "gpt-4o-mini"
 
 
 async def _run(*, embedding_key: str, llm_key: str, tenant_id: UUID) -> None:
     golden = load_golden(_HERE / "golden_set.json")
     embedder = OpenAIEmbedder(api_key=embedding_key, model=_EMBEDDING_MODEL, dimensions=1536)
-    llm = LangChainLLMClient(provider="openai", model=_RERANK_MODEL, api_key=llm_key)
 
     async with async_session_factory() as session:
+        # Use the tenant's configured rerank model so eval matches production.
+        config = await PostgresTenantConfigRepository(session).get_by_tenant_id(tenant_id)
+        rerank_model = config.rerank_model if config else _RERANK_MODEL_FALLBACK
+        llm = LangChainLLMClient(provider="openai", model=rerank_model, api_key=llm_key)
+
         rows = (
             await session.execute(
                 select(DocumentModel.id, DocumentModel.filename).where(DocumentModel.tenant_id == tenant_id)
@@ -72,7 +77,10 @@ async def _run(*, embedding_key: str, llm_key: str, tenant_id: UUID) -> None:
 
     await embedder.close()
     print(format_report(aggregate(outcomes, k=_TOP_K)))
-    print(f"  DB mode: real HybridRetriever (vector + BM25 + RRF + LLM rerank) over tenant {tenant_id}\n")
+    print(
+        f"  DB mode: real HybridRetriever (vector + BM25 + RRF + LLM rerank via {rerank_model}) "
+        f"over tenant {tenant_id}\n"
+    )
 
 
 def main() -> None:

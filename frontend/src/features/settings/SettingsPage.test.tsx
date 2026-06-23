@@ -54,6 +54,7 @@ const CONFIG: TenantConfigResponse = {
   llm_api_key_masked: "sk-****1234",
   llm_max_tokens: 1024,
   llm_temperature: 0.3,
+  rerank_model: "gpt-4o-mini",
   embedding_provider: "openai",
   embedding_model: "text-embedding-3-large",
   embedding_api_key_masked: "",
@@ -317,6 +318,26 @@ describe("SettingsPage", () => {
 
     await waitFor(() => {
       expect(updateLLM).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-4o" }), expect.anything());
+    });
+  });
+
+  it("submits LLM form with filled rerank model field", async () => {
+    vi.mocked(getSettings).mockResolvedValue(CONFIG);
+    vi.mocked(updateLLM).mockResolvedValue(CONFIG);
+    const { container } = render(<SettingsPage />, { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText("Save LLM config")).toBeInTheDocument());
+
+    const llmPanel = container.querySelector("[data-active='true'] .mantine-Accordion-panel");
+    const rerankInput =
+      llmPanel?.querySelector("input[data-path='rerank_model']") ?? screen.getAllByLabelText("Rerank model")[0]!;
+    fireEvent.change(rerankInput, { target: { value: "gpt-4.1-nano" } });
+    fireEvent.click(screen.getByText("Save LLM config"));
+
+    await waitFor(() => {
+      expect(updateLLM).toHaveBeenCalledWith(
+        expect.objectContaining({ rerank_model: "gpt-4.1-nano" }),
+        expect.anything(),
+      );
     });
   });
 

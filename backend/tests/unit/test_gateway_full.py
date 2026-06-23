@@ -158,6 +158,7 @@ async def test_gateway_no_token_usage_when_zero_tokens() -> None:
     mock_config.llm_api_key = "sk-test"
     mock_config.llm_provider = LLMProvider.OPENAI
     mock_config.llm_model = "gpt-4o-mini"
+    mock_config.rerank_model = "gpt-4o-mini"
     mock_config.llm_max_tokens = 1024
     mock_config.embedding_api_key = ""
     mock_config.embedding_model = "text-embedding-3-large"
@@ -206,6 +207,7 @@ async def test_gateway_applies_temperature_and_bot_personality() -> None:
     mock_config.llm_api_key = "sk-test"
     mock_config.llm_provider = LLMProvider.OPENAI
     mock_config.llm_model = "gpt-4o-mini"
+    mock_config.rerank_model = "gpt-4o-mini"
     mock_config.llm_max_tokens = 1024
     mock_config.llm_temperature = 0.7
     mock_config.embedding_api_key = ""

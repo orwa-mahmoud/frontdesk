@@ -40,6 +40,7 @@ class PostgresTenantConfigRepository:
         model.llm_api_key = encrypt_value(config.llm_api_key)
         model.llm_max_tokens = config.llm_max_tokens
         model.llm_temperature = config.llm_temperature
+        model.rerank_model = config.rerank_model
         model.embedding_provider = config.embedding_provider
         model.embedding_model = config.embedding_model
         model.embedding_api_key = encrypt_value(config.embedding_api_key)
@@ -70,6 +71,7 @@ class PostgresTenantConfigRepository:
             llm_api_key=encrypt_value(c.llm_api_key),
             llm_max_tokens=c.llm_max_tokens,
             llm_temperature=c.llm_temperature,
+            rerank_model=c.rerank_model,
             embedding_provider=c.embedding_provider,
             embedding_model=c.embedding_model,
             embedding_api_key=encrypt_value(c.embedding_api_key),
@@ -96,6 +98,7 @@ class PostgresTenantConfigRepository:
             llm_api_key=decrypt_value(m.llm_api_key),
             llm_max_tokens=m.llm_max_tokens,
             llm_temperature=m.llm_temperature,
+            rerank_model=m.rerank_model,
             embedding_provider=m.embedding_provider,
             embedding_model=m.embedding_model,
             embedding_api_key=decrypt_value(m.embedding_api_key),

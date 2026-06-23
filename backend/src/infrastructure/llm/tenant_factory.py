@@ -36,29 +36,39 @@ class TenantLLMClientFactory:
         self._lock = threading.Lock()
 
     def get_or_build(self, tenant_id: UUID, config: TenantConfig) -> LLMClientPort:
-        key = str(tenant_id)
+        """The tenant's answer-model client (used for chat replies)."""
+        return self._get_or_build(str(tenant_id), config.llm_provider.value, config.llm_model, config.llm_api_key)
+
+    def get_or_build_reranker(self, tenant_id: UUID, config: TenantConfig) -> LLMClientPort:
+        """A separate, cheap client for RAG reranking — same provider/key as the
+        answer model but the small `rerank_model`, so sorting snippets doesn't pay
+        answer-model rates. Cached under its own key alongside the answer client."""
+        return self._get_or_build(
+            f"{tenant_id}:rerank", config.llm_provider.value, config.rerank_model, config.llm_api_key
+        )
+
+    def _get_or_build(self, key: str, provider: str, model: str, api_key: str) -> LLMClientPort:
         with self._lock:
             entry = self._cache.get(key)
             if entry is not None and (time.monotonic() - entry[1]) <= self._ttl:
                 self._cache.move_to_end(key)
                 return entry[0]
 
-            client = LangChainLLMClient(
-                provider=config.llm_provider.value,
-                model=config.llm_model,
-                api_key=config.llm_api_key,
-            )
+            client = LangChainLLMClient(provider=provider, model=model, api_key=api_key)
             self._cache[key] = (client, time.monotonic())
             self._cache.move_to_end(key)
             while len(self._cache) > self._max_size:
                 self._cache.popitem(last=False)
-            logger.debug("tenant_llm_factory.built", tenant_id=key, model=config.llm_model)
+            logger.debug("tenant_llm_factory.built", key=key, model=model)
             return client
 
     def invalidate(self, tenant_id: UUID) -> None:
+        # Drop both the answer and rerank clients so the next chat rebuilds with the
+        # updated provider/model/key.
         with self._lock:
-            removed = self._cache.pop(str(tenant_id), None)
-        if removed:
+            removed_answer = self._cache.pop(str(tenant_id), None)
+            removed_rerank = self._cache.pop(f"{tenant_id}:rerank", None)
+        if removed_answer is not None or removed_rerank is not None:
             logger.info("tenant_llm_factory.invalidated", tenant_id=str(tenant_id))
 
     def clear(self) -> None:
