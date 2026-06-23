@@ -47,12 +47,13 @@ class PostgresDocumentRepository:
         result = await self._session.execute(stmt)
         return [self._to_entity(m) for m in result.scalars().all()]
 
-    async def list_processing(self, tenant_id: UUID) -> list[Document]:
+    async def list_processing(self, tenant_id: UUID, *, active_since: datetime) -> list[Document]:
         stmt = (
             select(DocumentModel)
             .where(
                 DocumentModel.tenant_id == tenant_id,
                 DocumentModel.status.in_((DocumentStatus.UPLOADED.value, DocumentStatus.INGESTING.value)),
+                DocumentModel.updated_at >= active_since,
             )
             .order_by(DocumentModel.created_at.desc())
         )

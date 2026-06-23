@@ -97,9 +97,45 @@ async def test_list_processing_returns_only_in_flight_documents(client: None) ->
         await uow.commit()
     async with async_session_factory() as session:
         uow = UnitOfWork(session)
-        result = await ListProcessingDocumentsUseCase(uow=uow).execute(ListProcessingDocuments(tenant_id=tenant.id))
+        result = await ListProcessingDocumentsUseCase(uow=uow).execute(
+            ListProcessingDocuments(tenant_id=tenant.id, active_since=datetime.now(UTC) - timedelta(hours=1))
+        )
         names = {d.filename for d in result}
         assert names == {"pending.md", "working.md"}
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_list_processing_excludes_documents_stuck_past_cutoff(client: None) -> None:
+    """A doc stuck in-flight past the cutoff drops out of /processing, so the UI
+    stops polling it — the reaper reclaims it out of band."""
+    tenant = await _make_tenant()
+    async with async_session_factory() as session:
+        uow = UnitOfWork(session)
+        fresh = Document.upload(
+            tenant_id=tenant.id,
+            uploaded_by_user_id=None,
+            filename="fresh.md",
+            mime_type=DocumentMimeType.MARKDOWN,
+            size_bytes=10,
+        )
+        stuck = Document.upload(
+            tenant_id=tenant.id,
+            uploaded_by_user_id=None,
+            filename="stuck.md",
+            mime_type=DocumentMimeType.MARKDOWN,
+            size_bytes=10,
+        )
+        stuck.updated_at = datetime.now(UTC) - timedelta(hours=1)
+        for d in (fresh, stuck):
+            await uow.documents.save(d)
+        await uow.commit()
+    async with async_session_factory() as session:
+        uow = UnitOfWork(session)
+        result = await ListProcessingDocumentsUseCase(uow=uow).execute(
+            ListProcessingDocuments(tenant_id=tenant.id, active_since=datetime.now(UTC) - timedelta(minutes=15))
+        )
+        assert {d.filename for d in result} == {"fresh.md"}
 
 
 @pytest.mark.integration
@@ -120,7 +156,9 @@ async def test_list_processing_isolated_by_tenant(client: None) -> None:
         await uow.commit()
     async with async_session_factory() as session:
         uow = UnitOfWork(session)
-        result = await ListProcessingDocumentsUseCase(uow=uow).execute(ListProcessingDocuments(tenant_id=tenant_b.id))
+        result = await ListProcessingDocumentsUseCase(uow=uow).execute(
+            ListProcessingDocuments(tenant_id=tenant_b.id, active_since=datetime.now(UTC) - timedelta(hours=1))
+        )
         assert result == []
 
 

@@ -49,7 +49,14 @@ EVAL_TENANT_ID=<uuid> \
 uv run python -m eval.db_eval        # or: make eval-db (from the repo root)
 ```
 
-Edit `golden_set.json` so `relevant_doc_ids` are that tenant's document
-filenames. Without the keys/tenant it prints how to enable it and exits 0, so it
-never breaks a default `make`. This is how you quantify what the reranker and
-Contextual Retrieval actually buy you; the same metrics module grades both modes.
+Each mode has its **own** dataset so editing one never breaks the other (offline
+runs in the CI gate):
+
+- **Offline** (`eval.run`) → `golden_set.json` — fixture filenames in `fixtures/`.
+- **DB** (`eval.db_eval`) → `golden_set.db.json` — set `relevant_doc_ids` to the
+  `EVAL_TENANT_ID` tenant's real ingested filenames. Override with
+  `EVAL_GOLDEN_PATH=/path/to/your.json`.
+
+Without the keys/tenant DB mode prints how to enable it and exits 0, so it never
+breaks a default `make`. This is how you quantify what the reranker and Contextual
+Retrieval actually buy you; the same metrics module grades both modes.

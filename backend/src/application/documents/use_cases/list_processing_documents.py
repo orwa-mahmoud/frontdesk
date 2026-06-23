@@ -17,5 +17,5 @@ class ListProcessingDocumentsUseCase:
         self._uow = uow
 
     async def execute(self, query: ListProcessingDocuments) -> list[DocumentDTO]:
-        docs = await self._uow.documents.list_processing(query.tenant_id)
+        docs = await self._uow.documents.list_processing(query.tenant_id, active_since=query.active_since)
         return [DocumentDTO.from_entity(d) for d in docs]

@@ -16,9 +16,11 @@ class DocumentRepository(Protocol):
 
     async def list_for_tenant(self, tenant_id: UUID, *, limit: int = 100, offset: int = 0) -> list[Document]: ...
 
-    async def list_processing(self, tenant_id: UUID) -> list[Document]:
-        """Documents still in flight (uploaded or ingesting) — drives the global
-        ingestion progress indicator, which polls this without fetching every doc."""
+    async def list_processing(self, tenant_id: UUID, *, active_since: datetime) -> list[Document]:
+        """Documents still actively in flight (uploaded or ingesting AND touched
+        since ``active_since``) — drives the global ingestion progress indicator,
+        which polls this without fetching every doc. Documents older than the cutoff
+        are treated as stuck (the reaper's job), so the UI stops polling them."""
         ...
 
     async def list_stuck(self, older_than: datetime) -> list[Document]:
