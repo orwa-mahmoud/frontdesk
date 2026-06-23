@@ -31,7 +31,7 @@ from src.ai.context.prompts import build_asker_system_prompt
 from src.ai.tools.escalate_question import ESCALATE_QUESTION_DEF
 from src.ai.tools.remove_key_fact import REMOVE_KEY_FACT_DEF
 from src.ai.tools.save_key_fact import SAVE_KEY_FACT_DEF
-from src.ai.tools.search_documents import SEARCH_DOCUMENTS_DEF
+from src.ai.tools.search_documents import SEARCH_DOCUMENTS_DEF, unwrap_excerpt
 from src.ai.types import AgentLoopResult, ChatInput, ChatResult, ChatSource
 from src.ai.utils.sender import resolve_sender
 from src.application.conversations.commands import SaveThreadMessage
@@ -241,7 +241,7 @@ def _extract_sources(result: AgentLoopResult, *, limit: int = 5, snippet_len: in
         if existing is None or score > existing.score:
             best[document_id] = ChatSource(
                 document_id=document_id,
-                snippet=str(row.get("content") or "")[:snippet_len],
+                snippet=unwrap_excerpt(str(row.get("content") or ""))[:snippet_len],
                 score=score,
             )
     return sorted(best.values(), key=lambda s: s.score, reverse=True)[:limit]
