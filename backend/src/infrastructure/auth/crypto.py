@@ -17,6 +17,7 @@ import structlog
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 from src.config.settings import get_settings
+from src.infrastructure.metrics import CRYPTO_DECRYPT_FAILURES_TOTAL
 
 logger = structlog.get_logger()
 
@@ -61,5 +62,34 @@ def decrypt_value(ciphertext: str) -> str:
     try:
         return cipher.decrypt(ciphertext[len(_ENC_PREFIX) :].encode()).decode()
     except InvalidToken:
+        # No key in the cipher could decrypt this — almost always a key rotated away
+        # without keeping the old one in ENCRYPTION_KEY_FALLBACKS. Returning "" here is
+        # what causes silent webhook 403s, so make it loud + alertable via the metric.
+        CRYPTO_DECRYPT_FAILURES_TOTAL.inc()
         logger.error("crypto.decrypt_failed", hint="ENCRYPTION_KEY rotated without a matching fallback?")
         return ""
+
+
+def verify_encryption_keys() -> None:
+    """Startup self-check: build the cipher from ENCRYPTION_KEY (+ fallbacks) and
+    round-trip a sentinel, so a malformed/unparseable key fails loudly at boot
+    instead of silently returning "" on a request months later.
+
+    Limitation: this proves the *configured* keys parse and round-trip. It cannot
+    prove that a fallback some *existing* ciphertext still depends on is present —
+    that case surfaces at runtime via the crypto_decrypt_failures metric.
+    """
+    try:
+        cipher = _get_cipher()
+    except (ValueError, TypeError) as exc:
+        raise RuntimeError(
+            "ENCRYPTION_KEY / ENCRYPTION_KEY_FALLBACKS contains an invalid Fernet key "
+            "(each must be a 32-byte url-safe base64 key). Generate one with: "
+            'python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
+        ) from exc
+    if cipher is None:
+        return  # no key configured (dev mode) — nothing to verify
+    sentinel = b"frontdesk-encryption-self-check"
+    if cipher.decrypt(cipher.encrypt(sentinel)) != sentinel:  # pragma: no cover - belt-and-suspenders
+        raise RuntimeError("ENCRYPTION_KEY self-check failed: the configured key did not round-trip.")
+    logger.info("crypto.self_check_ok")

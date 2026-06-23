@@ -48,7 +48,11 @@ Recently addressed:
   supplied and verified.
 - **Encryption-key rotation** — set the new key in `ENCRYPTION_KEY` and the
   previous one(s) in `ENCRYPTION_KEY_FALLBACKS`; old ciphertext keeps decrypting
-  until you re-encrypt and drop the fallback.
+  until you re-encrypt and drop the fallback. A botched rotation is surfaced rather
+  than silent: the app runs a **startup self-check** that refuses to boot if any
+  configured key is malformed, and every failed decrypt at runtime increments the
+  `frontdesk_crypto_decrypt_failures_total` metric — alert on it, since each failure
+  means a secret read back as `""` (e.g. webhook signature 403s).
 - **Durable webhook idempotency** — inbound messages carry the provider id under a
   partial unique index `(conversation_id, provider_message_id)` and save via
   `INSERT … ON CONFLICT DO NOTHING`, so a redelivered webhook is never processed
