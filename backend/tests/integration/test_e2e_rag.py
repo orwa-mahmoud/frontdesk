@@ -19,12 +19,13 @@ E2E_EMBEDDING_MODEL (default "text-embedding-3-small").
 
 from __future__ import annotations
 
-import asyncio
 import os
 import uuid
 
 import pytest
 from httpx import AsyncClient
+
+from src.drivers.jobs.ingestion import ingest_document
 
 _REQUIRED = ("RUN_E2E_RAG", "E2E_LLM_API_KEY", "E2E_EMBEDDING_API_KEY")
 pytestmark = pytest.mark.skipif(
@@ -43,7 +44,7 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-async def _register(client: AsyncClient) -> str:
+async def _register(client: AsyncClient) -> tuple[str, str]:
     slug = f"e2e-{uuid.uuid4().hex[:8]}"
     resp = await client.post(
         "/api/v1/auth/register",
@@ -56,14 +57,14 @@ async def _register(client: AsyncClient) -> str:
         },
     )
     assert resp.status_code == 201, resp.text
-    token: str = resp.json()["access_token"]
-    return token
+    body = resp.json()
+    return body["access_token"], body["tenant_id"]
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_rag_answers_from_uploaded_document(client: AsyncClient) -> None:
-    token = await _register(client)
+    token, tenant_id = await _register(client)
     headers = _auth(token)
 
     # Configure live provider credentials for this tenant.
@@ -97,17 +98,15 @@ async def test_rag_answers_from_uploaded_document(client: AsyncClient) -> None:
     assert upload.status_code in {200, 201}, upload.text
     doc_id = upload.json()["id"]
 
-    # Wait for ingestion to reach "ready" (parse → chunk → embed → persist).
-    for _ in range(30):
-        listing = await client.get("/api/v1/documents", headers=headers)
-        doc = next((d for d in listing.json() if d["id"] == doc_id), None)
-        assert doc is not None
-        if doc["status"] == "ready":
-            break
-        assert doc["status"] != "failed", f"ingestion failed: {doc.get('error')}"
-        await asyncio.sleep(2)
-    else:
-        pytest.fail("document did not reach 'ready' in time")
+    # Run the worker's ingestion job inline so the e2e drives the real
+    # parse → chunk → embed → persist path against the live providers.
+    await ingest_document(tenant_id=uuid.UUID(tenant_id), document_id=uuid.UUID(doc_id), filename="hours.txt")
+
+    listing = await client.get("/api/v1/documents", headers=headers)
+    doc = next((d for d in listing.json() if d["id"] == doc_id), None)
+    assert doc is not None
+    assert doc["status"] == "ready", f"ingestion did not complete: {doc.get('error')}"
+    assert doc["chunk_count"] >= 1
 
     # Ask a question answerable only from the document.
     chat = await client.post(

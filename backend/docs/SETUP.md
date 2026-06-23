@@ -85,6 +85,21 @@ uv run uvicorn src.main:app --reload --port 8000
 
 The API is available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
 
+### Start the ingestion worker
+
+Document ingestion (parse/chunk/embed) runs on an **Arq worker**, not in the web
+request, so you also need the worker running for uploads to be processed — without
+it, uploaded documents stay `uploaded` and never become `ready`. In a second shell:
+
+```bash
+uv run arq src.drivers.jobs.worker.WorkerSettings
+```
+
+It connects to the same Redis (`REDIS_URL`) and reads uploaded files from
+`UPLOAD_STORAGE_DIR` (default `var/uploads`), so the web and worker must share that
+directory. The worker also re-enqueues any document stuck mid-ingest on a restart.
+(The Docker setup runs this `worker` service for you.)
+
 ---
 
 ## 6. Running Tests

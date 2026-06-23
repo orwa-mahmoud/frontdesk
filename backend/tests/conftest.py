@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 
 # ── Set test env BEFORE any `src.*` import so settings resolve to the test DB ─
 os.environ.setdefault(
@@ -15,6 +16,8 @@ os.environ.setdefault(
 )
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-not-for-production")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
+# Stream uploaded files to a throwaway dir so the suite never touches the real one.
+os.environ.setdefault("UPLOAD_STORAGE_DIR", tempfile.mkdtemp(prefix="frontdesk-test-uploads-"))
 os.environ["APP_ENV"] = "test"  # forces NullPool in the engine factory
 
 from collections.abc import AsyncIterator
@@ -56,11 +59,22 @@ async def _clean_db() -> AsyncIterator[None]:
 
 @pytest_asyncio.fixture
 async def client(_clean_db: None) -> AsyncIterator[AsyncClient]:
+    from unittest.mock import AsyncMock
+
+    from src.drivers.api.dependencies import get_job_pool
     from src.main import app
 
+    # ASGITransport doesn't run the lifespan, so the real Arq pool is never created.
+    # Override the dependency with a no-op pool: uploads enqueue against a mock and the
+    # document stays `uploaded` until a worker (or a direct `ingest_document` call) runs it.
+    no_op_pool = AsyncMock()
+    app.dependency_overrides[get_job_pool] = lambda: no_op_pool
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+    finally:
+        app.dependency_overrides.pop(get_job_pool, None)
 
 
 async def register_and_token(client: AsyncClient) -> tuple[str, str, str]:

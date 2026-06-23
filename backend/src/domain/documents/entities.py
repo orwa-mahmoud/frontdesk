@@ -67,7 +67,9 @@ class Document(BaseEntity):
         return doc
 
     def mark_ingesting(self) -> None:
-        if self.status not in {DocumentStatus.UPLOADED, DocumentStatus.FAILED}:
+        # INGESTING is allowed for re-entry: a crashed job leaves the row INGESTING and
+        # the worker/reaper re-runs it idempotently.
+        if self.status not in {DocumentStatus.UPLOADED, DocumentStatus.FAILED, DocumentStatus.INGESTING}:
             raise InvalidOperationError(f"Cannot start ingestion from status {self.status}")
         self.status = DocumentStatus.INGESTING
         self.error = None

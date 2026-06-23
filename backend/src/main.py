@@ -25,6 +25,7 @@ from src.drivers.api.v1.health.routes import router as health_router
 from src.drivers.api.v1.router import v1_router
 from src.drivers.api.webhooks.telegram import router as telegram_webhook_router
 from src.drivers.api.webhooks.whatsapp import router as whatsapp_webhook_router
+from src.drivers.jobs.queue import create_job_pool
 
 logger = structlog.get_logger()
 
@@ -44,7 +45,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     validate_production_settings(settings)
     logger.info("app.startup", env=settings.app_env, name=settings.app_name)
     await bootstrap_platform_admin(settings)
+    # Connect the Arq job queue (ingestion runs on the worker). Skipped under the test
+    # env, which drives the app via ASGITransport with no Redis/worker.
+    app.state.job_pool = None
+    if settings.app_env != "test":
+        app.state.job_pool = await create_job_pool()
     yield
+    if app.state.job_pool is not None:
+        await app.state.job_pool.close()
     logger.info("app.shutdown")
 
 
@@ -70,6 +78,8 @@ def create_app() -> FastAPI:
     )
 
     app.state.limiter = limiter
+    # Set by the lifespan in non-test envs; None under tests (the dep is overridden).
+    app.state.job_pool = None
     # Disable rate limiting under the test env so the suite's many login/register
     # calls from one client aren't throttled; enforced in dev and production.
     limiter.enabled = get_settings().app_env != "test"

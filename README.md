@@ -147,7 +147,7 @@ tracks token usage per tenant with full cost accountability.
 ### Docker (recommended)
 
 Requires Docker + Docker Compose. Brings up Postgres (with pgvector), Redis,
-the backend, and the frontend.
+the backend, the ingestion worker, and the frontend.
 
 ```bash
 cp .env.docker.example .env.docker
@@ -179,6 +179,10 @@ uv sync --extra dev
 createdb frontdesk_db && psql frontdesk_db -c 'CREATE EXTENSION vector;'
 uv run alembic upgrade head
 uv run uvicorn src.main:app --reload --port 8000
+
+# Ingestion worker (second shell, same dir) — processes uploaded documents.
+# Without it, uploads stay "uploaded" and never become "ready".
+uv run arq src.drivers.jobs.worker.WorkerSettings
 
 # Frontend
 cd frontend

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -121,6 +122,51 @@ async def test_list_processing_isolated_by_tenant(client: None) -> None:
         uow = UnitOfWork(session)
         result = await ListProcessingDocumentsUseCase(uow=uow).execute(ListProcessingDocuments(tenant_id=tenant_b.id))
         assert result == []
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_list_stuck_returns_only_stale_in_flight_documents(client: None) -> None:
+    """The reaper reclaims documents left uploaded/ingesting past the stale window,
+    across all tenants — but never fresh ones, and never already-finished ones."""
+    tenant = await _make_tenant()
+    old = datetime.now(UTC) - timedelta(hours=1)
+    cutoff = datetime.now(UTC) - timedelta(minutes=15)
+
+    def _doc(filename: str) -> Document:
+        return Document.upload(
+            tenant_id=tenant.id,
+            uploaded_by_user_id=None,
+            filename=filename,
+            mime_type=DocumentMimeType.MARKDOWN,
+            size_bytes=10,
+        )
+
+    async with async_session_factory() as session:
+        uow = UnitOfWork(session)
+
+        stale_uploaded = _doc("stale-uploaded.md")
+        stale_uploaded.updated_at = old
+
+        stale_ingesting = _doc("stale-ingesting.md")
+        stale_ingesting.mark_ingesting()
+        stale_ingesting.updated_at = old
+
+        fresh_uploaded = _doc("fresh.md")  # updated just now → not yet stale
+
+        stale_ready = _doc("done.md")  # old but finished → must be left alone
+        stale_ready.mark_ingesting()
+        stale_ready.mark_ready(chunk_count=2)
+        stale_ready.updated_at = old
+
+        for d in (stale_uploaded, stale_ingesting, fresh_uploaded, stale_ready):
+            await uow.documents.save(d)
+        await uow.commit()
+
+    async with async_session_factory() as session:
+        uow = UnitOfWork(session)
+        stuck = await uow.documents.list_stuck(older_than=cutoff)
+        assert {d.filename for d in stuck} == {"stale-uploaded.md", "stale-ingesting.md"}
 
 
 @pytest.mark.integration

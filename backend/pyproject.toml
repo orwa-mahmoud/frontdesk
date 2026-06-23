@@ -27,8 +27,9 @@ dependencies = [
     "pypdf>=5.0.0",
     "python-docx>=1.1.0",
     "tiktoken>=0.12.0",
-    # ── Redis (thread locking, message queue) ─────────────────────
+    # ── Redis (thread locking, message queue) + Arq ingestion jobs ─
     "redis[hiredis]>=6.0.0",
+    "arq>=0.25.0",
     # ── Channels ──────────────────────────────────────────────────
     "python-telegram-bot>=22.6",
     # ── Auth + utilities ──────────────────────────────────────────

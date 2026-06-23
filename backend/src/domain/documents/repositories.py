@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -18,6 +19,12 @@ class DocumentRepository(Protocol):
     async def list_processing(self, tenant_id: UUID) -> list[Document]:
         """Documents still in flight (uploaded or ingesting) — drives the global
         ingestion progress indicator, which polls this without fetching every doc."""
+        ...
+
+    async def list_stuck(self, older_than: datetime) -> list[Document]:
+        """Documents stuck mid-ingest (uploaded/ingesting) and untouched since
+        ``older_than``, across ALL tenants — for the reaper. The caller must run
+        without a tenant scope so it sees every tenant's stragglers."""
         ...
 
     async def count_for_tenant(self, tenant_id: UUID) -> int: ...
