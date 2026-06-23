@@ -3,7 +3,7 @@ import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { IconCopy, IconMail, IconTrash, IconUserPlus } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
+import { formatDate } from "@shared/utils/datetime";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -56,7 +56,7 @@ function StatusCell({ row }: Readonly<CellProps<Invitation>>) {
 function ExpiresCell({ row }: Readonly<CellProps<Invitation>>) {
   return (
     <Text size="sm" c="dimmed">
-      {dayjs(row.expires_at).format("MMM D, YYYY")}
+      {formatDate(row.expires_at)}
     </Text>
   );
 }

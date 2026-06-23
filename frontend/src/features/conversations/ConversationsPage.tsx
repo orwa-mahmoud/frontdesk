@@ -14,7 +14,7 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import { IconEye, IconMessageCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
+import { formatDateTime } from "@shared/utils/datetime";
 import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -125,7 +125,7 @@ function TranscriptDrawer({
                     {isVisitor ? t("conversations.visitor") : t("conversations.assistant")}
                   </Text>
                   <Text size="xs" c="dimmed">
-                    {dayjs(m.created_at).format("MMM D, HH:mm")}
+                    {formatDateTime(m.created_at)}
                   </Text>
                 </Group>
                 <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
@@ -175,7 +175,7 @@ function ChannelCell({ row }: Readonly<CellProps<ConversationSummary>>) {
 function LastMessageCell({ row }: Readonly<CellProps<ConversationSummary>>) {
   return (
     <Text size="sm" c="dimmed">
-      {row.last_message_at ? dayjs(row.last_message_at).format("MMM D, HH:mm") : "—"}
+      {row.last_message_at ? formatDateTime(row.last_message_at) : "—"}
     </Text>
   );
 }
@@ -183,7 +183,7 @@ function LastMessageCell({ row }: Readonly<CellProps<ConversationSummary>>) {
 function CreatedCell({ row }: Readonly<CellProps<ConversationSummary>>) {
   return (
     <Text size="sm" c="dimmed">
-      {dayjs(row.created_at).format("MMM D, HH:mm")}
+      {formatDateTime(row.created_at)}
     </Text>
   );
 }

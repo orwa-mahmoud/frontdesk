@@ -47,12 +47,6 @@ AGENT_TOOL_CALLS_TOTAL = Counter(
     ["tool_name"],
 )
 
-AGENT_DURATION = Histogram(
-    "frontdesk_agent_duration_seconds",
-    "Agent loop latency (includes all LLM + tool calls)",
-    ["channel"],
-)
-
 # ── RAG ───────────────────────────────────────────────────────────
 RAG_RETRIEVALS_TOTAL = Counter(
     "frontdesk_rag_retrievals_total",

@@ -1,8 +1,8 @@
-import { Center, Loader } from "@mantine/core";
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
 import { useAuth } from "@auth/useAuth";
+import { LoadingFullPage } from "@shared/components/LoadingFullPage";
 
 /**
  * Route guard for the platform-admin console. Assumes it renders inside
@@ -13,11 +13,7 @@ export function RequirePlatformAdmin({ children }: Readonly<{ children: ReactNod
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <Center mih="100vh">
-        <Loader />
-      </Center>
-    );
+    return <LoadingFullPage />;
   }
   if (!user?.is_platform_admin) {
     return <Navigate to="/" replace />;
