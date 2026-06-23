@@ -75,6 +75,7 @@ async def test_process_marks_ready_and_saves_chunks() -> None:
     assert doc.chunk_count == 2
     uow.chunks.save_many.assert_called_once()
     assert len(uow.chunks.save_many.call_args[0][0]) == 2
+    uow.track.assert_called_with(doc)  # DocumentIngested is dispatched after commit
 
 
 @pytest.mark.asyncio
@@ -88,6 +89,7 @@ async def test_process_empty_after_parsing_marks_failed() -> None:
     assert doc.status == DocumentStatus.FAILED
     assert doc.error
     uow.commit.assert_awaited()
+    uow.track.assert_called_with(doc)  # DocumentIngestionFailed is dispatched after commit
 
 
 @pytest.mark.asyncio

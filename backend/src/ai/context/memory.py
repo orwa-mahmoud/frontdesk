@@ -10,23 +10,22 @@ line and pose as an instruction.
 
 from __future__ import annotations
 
-import re
 from uuid import UUID
 
 from src.application.shared.unit_of_work import UnitOfWork
+from src.domain.shared.utils import strip_control_chars
 
 # Facts are injected into the system prompt every turn; cap the count so a
 # long-lived contact's accumulated facts can't bloat the prompt unboundedly.
 _MAX_FACTS = 50
 _MAX_KEY_LEN = 60
 _MAX_VALUE_LEN = 200
-# Newlines and other control chars are how a value would break onto its own line
-# and impersonate a new instruction; collapse runs of them to a single space.
-_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]+")
 
 
 def _sanitize(text: str, *, limit: int) -> str:
-    cleaned = _CONTROL_RE.sub(" ", text).strip()
+    # Collapse all control chars (incl. newlines) so a fact value can't break
+    # onto its own line and impersonate a new instruction.
+    cleaned = strip_control_chars(text).strip()
     return cleaned[:limit].rstrip() if len(cleaned) > limit else cleaned
 
 
