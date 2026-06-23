@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
@@ -54,6 +55,18 @@ class PostgresDocumentRepository:
                 DocumentModel.status.in_((DocumentStatus.UPLOADED.value, DocumentStatus.INGESTING.value)),
             )
             .order_by(DocumentModel.created_at.desc())
+        )
+        result = await self._session.execute(stmt)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def list_stuck(self, older_than: datetime) -> list[Document]:
+        stmt = (
+            select(DocumentModel)
+            .where(
+                DocumentModel.status.in_((DocumentStatus.UPLOADED.value, DocumentStatus.INGESTING.value)),
+                DocumentModel.updated_at < older_than,
+            )
+            .order_by(DocumentModel.updated_at)
         )
         result = await self._session.execute(stmt)
         return [self._to_entity(m) for m in result.scalars().all()]

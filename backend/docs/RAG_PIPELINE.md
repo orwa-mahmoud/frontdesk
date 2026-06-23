@@ -14,12 +14,21 @@ Frontdesk uses a hybrid retrieval-augmented generation pipeline to ground the AI
   Owner uploads file
         │
         ▼
-  IngestDocumentUseCase (application/documents/use_cases/ingest_document.py)
+  Web request (drivers/api/v1/documents/routes.py)
+        ├── stream raw bytes to disk  ──  <UPLOAD_STORAGE_DIR>/<tenant>/<doc_id>
+        ├── RegisterDocumentUseCase   ──  status = UPLOADED
+        └── enqueue document_id        ──  Arq / Redis  (only the id, never the bytes)
         │
+        ▼
+  Arq worker (drivers/jobs/worker.py → ingestion.py → ProcessDocumentUseCase)
+        │   reads the file back from disk by id
         ├── 1. Parse    ──  infrastructure/rag/parser.py
         ├── 2. Chunk    ──  infrastructure/rag/chunker.py
         ├── 3. Embed    ──  infrastructure/rag/embedder.py
         └── 4. Persist  ──  Chunk rows (content + embedding + tsvector)
+
+  Reaper (cron in the worker): re-enqueues any document left UPLOADED/INGESTING
+  past INGESTION_STALE_AFTER_SECONDS — the file is still on disk, so a crash recovers.
 
                          RETRIEVAL (read path)
                          ─────────────────────
@@ -38,9 +47,15 @@ Frontdesk uses a hybrid retrieval-augmented generation pipeline to ground the AI
 
 ## Document Ingestion
 
-**Entry point:** `IngestDocumentUseCase` in `application/documents/use_cases/ingest_document.py`.
+Ingestion is **durable**: the heavy work runs on an Arq worker, not in the web request, and survives restarts.
 
-The use case orchestrates ports (chunker, embedder) without knowing their implementations. Errors during parsing or embedding mark the document FAILED without losing the upload metadata, so the owner can see what happened in the dashboard.
+1. **Upload** (`drivers/api/v1/documents/routes.py`): the request streams the raw file straight to disk in fixed-size chunks (constant memory, even for big or many concurrent uploads), records the document via `RegisterDocumentUseCase` (status `UPLOADED`), and enqueues **only the `document_id`** — the bytes stay on disk, so the Redis payload is tiny and constant.
+2. **Process** (`drivers/jobs/ingestion.py` → `ProcessDocumentUseCase`): the worker loads the file back from disk by id and runs parse → chunk → embed → persist. The use case orchestrates ports (chunker, embedder) without knowing their implementations. It is idempotent: an already-`READY` document is a no-op, so a retried or re-enqueued job is safe.
+3. **Recover** (reaper cron in `drivers/jobs/worker.py`): any document stuck in `UPLOADED`/`INGESTING` past `INGESTION_STALE_AFTER_SECONDS` is re-enqueued — the file is still on disk, so a crash or lost job recovers instead of sticking forever.
+
+Errors during parsing or embedding mark the document FAILED with a reason string (without losing the upload metadata), so the owner can see what happened in the dashboard. Unexpected/transient errors propagate so Arq retries with backoff.
+
+> Storage is behind the `DocumentStoragePort` (`domain/documents/ports.py`); the default adapter is `DiskDocumentStorage` writing to `UPLOAD_STORAGE_DIR`, which **must be a shared volume** between the web and worker containers.
 
 ### Step 1: Parse
 
@@ -132,15 +147,15 @@ Each chunk becomes a `Chunk` entity row:
 ### Ingestion Lifecycle
 
 ```text
-Document.upload()     → status = UPLOADED
-doc.mark_ingesting()  → status = INGESTING (flushed to DB)
+Document.upload()     → status = UPLOADED   (web request; file on disk, id enqueued)
+doc.mark_ingesting()  → status = INGESTING  (worker picks up the job)
   ├── parse + chunk + embed + persist chunks
   └── doc.mark_ready(chunk_count=N)   → status = READY
       OR
-      doc.mark_failed(reason="...")    → status = FAILED
+      doc.force_failed(reason="...")   → status = FAILED
 ```
 
-Errors during parsing or embedding are caught, the document is marked FAILED with a reason string, and the error is re-raised. The owner sees the failure in the dashboard and can re-upload.
+`mark_ingesting` also accepts re-entry from `INGESTING` (a crashed job leaves the row `INGESTING`; the worker/reaper re-runs it idempotently). Errors during parsing or embedding mark the document FAILED with a reason string; the owner sees the failure in the dashboard and can re-upload.
 
 ---
 
@@ -237,7 +252,13 @@ The retriever supports an optional `RerankerPort` (Step 4, after RRF fusion). A 
 | `infrastructure/rag/chunker.py` | `RecursiveTokenChunker` -- token-aware recursive splitting |
 | `infrastructure/rag/embedder.py` | `OpenAIEmbedder` -- OpenAI embeddings endpoint adapter |
 | `infrastructure/rag/retriever.py` | `HybridRetriever` -- vector + BM25 + RRF fusion |
-| `application/documents/use_cases/ingest_document.py` | `IngestDocumentUseCase` -- orchestrates parse/chunk/embed/persist |
+| `application/documents/use_cases/process_document.py` | `ProcessDocumentUseCase` -- orchestrates parse/chunk/embed/persist |
+| `application/documents/use_cases/register_document.py` | `RegisterDocumentUseCase` -- records the upload (status UPLOADED) |
+| `domain/documents/ports.py` | `DocumentStoragePort` -- durable raw-file storage |
+| `infrastructure/storage/disk_document_storage.py` | `DiskDocumentStorage` -- streams files to `UPLOAD_STORAGE_DIR` |
+| `drivers/jobs/worker.py` | Arq `WorkerSettings`: `process_document` job + reaper cron |
+| `drivers/jobs/ingestion.py` | Worker-side ingestion runner (loads file, runs `ProcessDocumentUseCase`) |
+| `drivers/jobs/queue.py` | Arq pool + `enqueue_document_ingestion` (web → worker handoff) |
 | `domain/rag/ports.py` | Domain port protocols (`ChunkerPort`, `EmbeddingPort`, `RetrieverPort`) |
 | `domain/rag/value_objects.py` | `TextChunk`, `RetrievedChunk` |
 | `domain/documents/entities.py` | `Document` (status machine), `Chunk` (create factory) |

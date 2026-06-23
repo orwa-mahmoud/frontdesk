@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     # Public base URL of the web app, used to build invitation links.
     frontend_base_url: str = "http://localhost:5173"
 
+    # ── Uploads / ingestion jobs ───────────────────────────────────
+    # Where raw uploaded files are streamed to disk (shared volume between the web
+    # and the worker). Files live at <dir>/<tenant_id>/<document_id>.
+    upload_storage_dir: str = "var/uploads"
+    # Seconds a document may sit in uploaded/ingesting before the reaper reclaims it.
+    ingestion_stale_after_seconds: int = 900
+
     # ── Encryption (Fernet key for tenant secrets at rest) ─────────
     encryption_key: str | None = None
     # Previous Fernet keys (comma-separated) kept readable during a key rotation.

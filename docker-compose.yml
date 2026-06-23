@@ -29,10 +29,43 @@ services:
     env_file: .env.docker
     ports:
       - "8000:8000"
+    # Raw uploads are streamed here and read back by the worker — both mount the
+    # same volume so the file the web wrote is the file the worker ingests.
+    volumes:
+      - uploads:/app/var/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Arq worker: runs document ingestion (parse/chunk/embed) off the web request and
+  # re-enqueues stuck documents, so ingestion survives restarts. Starts after the
+  # backend is healthy (migrations applied), so its own entrypoint upgrade is a no-op.
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env.docker
+    command: ["uv", "run", "--no-sync", "arq", "src.drivers.jobs.worker.WorkerSettings"]
+    volumes:
+      - uploads:/app/var/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
         condition: service_healthy
 
   frontend:
@@ -46,3 +79,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

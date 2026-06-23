@@ -10,6 +10,7 @@ Hexagonal DDD + CQRS. The AI agent is a cross-cutting orchestration layer that c
 |                                                           |
 |  drivers/api/v1/    FastAPI REST endpoints                |
 |  drivers/api/webhooks/  WhatsApp, Telegram, Chat API      |
+|  drivers/jobs/      Arq worker: document ingestion        |
 |                          |                                |
 +---------------------------+-------------------------------+
                             v
@@ -267,6 +268,10 @@ src/
 |   |       +-- whatsapp.py       # Meta Cloud API webhook (verify + message handler)
 |   |       +-- telegram.py       # Telegram Bot API webhook
 |   |       +-- chat_api.py       # Direct API chat endpoint
+|   +-- jobs/                      # Arq worker (durable document ingestion)
+|   |   +-- worker.py             # WorkerSettings: process_document job + reaper cron
+|   |   +-- ingestion.py          # Worker-side runner (loads file, ProcessDocumentUseCase)
+|   |   +-- queue.py              # Arq pool + enqueue_document_ingestion (web -> worker)
 |
 +-- infrastructure/
 |   +-- ai/

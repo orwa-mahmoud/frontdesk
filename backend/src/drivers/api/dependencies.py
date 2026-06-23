@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 from uuid import UUID
 
+from arq.connections import ArqRedis
 from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +35,17 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 def get_uow(session: Annotated[AsyncSession, Depends(get_session)]) -> UnitOfWork:
     return UnitOfWork(session)
+
+
+def get_job_pool(request: Request) -> ArqRedis:
+    """The Arq pool for enqueueing ingestion jobs. Overridden in tests."""
+    pool: ArqRedis | None = request.app.state.job_pool
+    if pool is None:
+        raise RuntimeError("Job queue is not available")
+    return pool
+
+
+JobPoolDep = Annotated[ArqRedis, Depends(get_job_pool)]
 
 
 _COOKIE_NAME = "frontdesk_token"
