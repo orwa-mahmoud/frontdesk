@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from src.infrastructure.metrics import (
-    AGENT_DURATION,
     AGENT_INVOCATIONS_TOTAL,
     AGENT_TOOL_CALLS_TOTAL,
     HTTP_REQUEST_DURATION,
@@ -17,7 +16,7 @@ from src.infrastructure.metrics import (
 
 
 def test_all_metrics_importable() -> None:
-    """Verify all 10 metrics are importable."""
+    """Verify all 9 metrics are importable."""
     metrics = [
         HTTP_REQUESTS_TOTAL,
         HTTP_REQUEST_DURATION,
@@ -25,12 +24,11 @@ def test_all_metrics_importable() -> None:
         LLM_TOKENS_TOTAL,
         AGENT_INVOCATIONS_TOTAL,
         AGENT_TOOL_CALLS_TOTAL,
-        AGENT_DURATION,
         RAG_RETRIEVALS_TOTAL,
         QUESTIONS_SUBMITTED_TOTAL,
         QUESTIONS_RESOLVED_TOTAL,
     ]
-    assert len(metrics) == 10
+    assert len(metrics) == 9
     for m in metrics:
         assert m._name
 

@@ -9,7 +9,7 @@ import {
   IconUpload,
 } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
+import { formatDateTime } from "@shared/utils/datetime";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -121,7 +121,7 @@ function SizeCell({ row }: Readonly<CellProps<DocumentSummary>>) {
 function UploadedCell({ row }: Readonly<CellProps<DocumentSummary>>) {
   return (
     <Text size="sm" c="dimmed">
-      {dayjs(row.created_at).format("MMM D, HH:mm")}
+      {formatDateTime(row.created_at)}
     </Text>
   );
 }

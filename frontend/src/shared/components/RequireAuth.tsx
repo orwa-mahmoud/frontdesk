@@ -1,19 +1,15 @@
-import { Center, Loader } from "@mantine/core";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import { useAuth } from "@auth/useAuth";
+import { LoadingFullPage } from "@shared/components/LoadingFullPage";
 
 export function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return (
-      <Center mih="100vh">
-        <Loader />
-      </Center>
-    );
+    return <LoadingFullPage />;
   }
   if (!user) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;

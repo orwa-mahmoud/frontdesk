@@ -21,7 +21,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { IconArchive, IconRefresh, IconRobot, IconSend } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
+import { formatDateTime } from "@shared/utils/datetime";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -161,7 +161,7 @@ export function InboxPage() {
                       </Text>
                     )}
                     <Text size="xs" c="dimmed" ml="auto">
-                      {dayjs(q.created_at).format("MMM D, HH:mm")}
+                      {formatDateTime(q.created_at)}
                     </Text>
                   </Group>
                   <Text mb="sm">{q.question_text}</Text>

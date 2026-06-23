@@ -1,8 +1,8 @@
-import { Center, Loader } from "@mantine/core";
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
 import { useAuth } from "@auth/useAuth";
+import { LoadingFullPage } from "@shared/components/LoadingFullPage";
 
 /**
  * Route guard for tenant-owner-only pages (settings, team). Assumes it renders
@@ -12,11 +12,7 @@ export function RequireOwner({ children }: Readonly<{ children: ReactNode }>) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <Center mih="100vh">
-        <Loader />
-      </Center>
-    );
+    return <LoadingFullPage />;
   }
   if (user?.tenant.role !== "owner") {
     return <Navigate to="/" replace />;
