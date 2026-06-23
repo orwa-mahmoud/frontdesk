@@ -26,6 +26,8 @@ import {
 import { EmptyState } from "@shared/components/EmptyState";
 import { useMutationWithNotification } from "@shared/hooks/useMutationWithNotification";
 
+import { isActivelyProcessing } from "./processing";
+
 interface DocumentSummary {
   id: string;
   filename: string;
@@ -73,8 +75,6 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
-
-const PROCESSING_STATUSES = new Set(["uploaded", "ingesting"]);
 
 // Cell renderers are module-level components (stable identity; keeps them out of
 // the page component body per Sonar S6478).
@@ -128,13 +128,13 @@ function UploadedCell({ row }: Readonly<CellProps<DocumentSummary>>) {
 
 export function DocumentsPage() {
   const { t } = useTranslation();
-  // Poll while any document is still processing so it flips to "ready"
-  // (or "failed") in the UI without a manual refresh.
+  // Poll while any document is still actively processing so it flips to "ready"
+  // (or "failed") without a manual refresh — but stop once the only in-flight docs
+  // are stale, so an upload stuck mid-ingest doesn't poll forever.
   const documentsQuery = useQuery({
     queryKey: ["documents"],
     queryFn: listDocuments,
-    refetchInterval: (query) =>
-      query.state.data?.some((d) => PROCESSING_STATUSES.has(d.status)) ? 4000 : false,
+    refetchInterval: (query) => (query.state.data?.some(isActivelyProcessing) ? 4000 : false),
   });
 
   const uploadMutation = useMutationWithNotification({

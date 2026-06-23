@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -17,6 +18,7 @@ from src.application.documents.use_cases.list_processing_documents import ListPr
 from src.application.documents.use_cases.register_document import RegisterDocumentUseCase
 from src.application.documents.use_cases.retrieve_for_query import RetrieveForQueryUseCase
 from src.application.shared.unit_of_work import UnitOfWork
+from src.config.settings import get_settings
 from src.domain.shared.exceptions import EntityNotFoundError
 from src.domain.tenant_config.entities import TenantConfig
 from src.drivers.api.dependencies import CurrentUser, JobPoolDep, UnitOfWorkDep, resolve_tenant_id
@@ -28,7 +30,9 @@ from src.drivers.api.v1.documents.schemas import (
 )
 from src.drivers.jobs.ingestion import document_storage
 from src.drivers.jobs.queue import enqueue_document_ingestion
+from src.infrastructure.llm.client import LangChainLLMClient
 from src.infrastructure.rag.embedder import OpenAIEmbedder
+from src.infrastructure.rag.reranker import LLMReranker
 from src.infrastructure.rag.retriever import HybridRetriever
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -67,6 +71,19 @@ def _build_embedder(config: TenantConfig) -> OpenAIEmbedder:
         api_key=config.embedding_api_key or config.llm_api_key,
         model=config.embedding_model,
         dimensions=_EMBEDDING_DIMENSIONS,
+    )
+
+
+def _build_reranker(config: TenantConfig) -> LLMReranker:
+    """The same reranker the gateway wires in production — a cheap dedicated rerank
+    model reusing the tenant's LLM provider + key — so the trace reflects what the
+    agent actually retrieves, not an un-reranked approximation."""
+    return LLMReranker(
+        LangChainLLMClient(
+            provider=config.llm_provider.value,
+            model=config.rerank_model,
+            api_key=config.llm_api_key,
+        )
     )
 
 
@@ -151,9 +168,14 @@ async def list_processing_documents(
 
     Lightweight by design: returns only the few documents still being ingested,
     so any page can poll it cheaply and a refresh re-derives progress from the DB.
+    Documents stuck past the reaper window are excluded so the indicator stops
+    polling them — the reaper reclaims them out of band.
     """
     tenant_id = await resolve_tenant_id(current_user, uow)
-    dtos = await ListProcessingDocumentsUseCase(uow=uow).execute(ListProcessingDocuments(tenant_id=tenant_id))
+    cutoff = datetime.now(UTC) - timedelta(seconds=get_settings().ingestion_stale_after_seconds)
+    dtos = await ListProcessingDocumentsUseCase(uow=uow).execute(
+        ListProcessingDocuments(tenant_id=tenant_id, active_since=cutoff)
+    )
     return [_to_summary(d) for d in dtos]
 
 
@@ -174,11 +196,16 @@ async def retrieve(
     current_user: CurrentUser,
     uow: UnitOfWorkDep,
 ) -> RetrieveResponse:
-    """Test endpoint: run the hybrid retriever and return the matched chunks
-    + RRF scores. Useful for tuning the index and for the future "trace" UI."""
+    """Trace endpoint: run the *production* hybrid retriever (vector + BM25 + RRF +
+    the same LLM reranker the agent uses) and return the matched chunks + scores.
+    Useful for tuning the index and for the future "trace" UI."""
     tenant_id = await resolve_tenant_id(current_user, uow)
     config = await _load_tenant_config(tenant_id, uow)
-    retriever = HybridRetriever(session=uow._session, embedder=_build_embedder(config))
+    retriever = HybridRetriever(
+        session=uow._session,
+        embedder=_build_embedder(config),
+        reranker=_build_reranker(config),
+    )
     dtos = await RetrieveForQueryUseCase(retriever=retriever).execute(
         RetrieveForQuery(tenant_id=tenant_id, query=req.query, top_k=req.top_k)
     )

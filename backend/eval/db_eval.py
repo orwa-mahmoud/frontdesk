@@ -12,7 +12,9 @@ Point it at an ingested tenant and supply keys:
     EVAL_TENANT_ID=<uuid> \\
     uv run python -m eval.db_eval
 
-Edit `golden_set.json` so `relevant_doc_ids` are that tenant's document filenames.
+DB mode reads its OWN dataset, `golden_set.db.json` (separate from the offline
+`golden_set.json` so editing one never breaks the other) — set `relevant_doc_ids`
+to that tenant's real document filenames. Override the path with `EVAL_GOLDEN_PATH`.
 Without the keys/tenant it prints how to enable it and exits 0.
 """
 
@@ -43,10 +45,11 @@ _TOP_K = 8
 _ESCALATE_THRESHOLD = 0.25
 _EMBEDDING_MODEL = "text-embedding-3-large"
 _RERANK_MODEL_FALLBACK = "gpt-4o-mini"
+_DEFAULT_GOLDEN = "golden_set.db.json"  # DB mode's own dataset (offline uses golden_set.json)
 
 
-async def _run(*, embedding_key: str, llm_key: str, tenant_id: UUID) -> None:
-    golden = load_golden(_HERE / "golden_set.json")
+async def _run(*, embedding_key: str, llm_key: str, tenant_id: UUID, golden_path: Path) -> None:
+    golden = load_golden(golden_path)
     embedder = OpenAIEmbedder(api_key=embedding_key, model=_EMBEDDING_MODEL, dimensions=1536)
 
     async with async_session_factory() as session:
@@ -95,7 +98,9 @@ def main() -> None:
             file=sys.stderr,
         )
         return
-    asyncio.run(_run(embedding_key=embedding_key, llm_key=llm_key, tenant_id=UUID(tenant_raw)))
+    golden_override = os.environ.get("EVAL_GOLDEN_PATH")
+    golden_path = Path(golden_override) if golden_override else _HERE / _DEFAULT_GOLDEN
+    asyncio.run(_run(embedding_key=embedding_key, llm_key=llm_key, tenant_id=UUID(tenant_raw), golden_path=golden_path))
 
 
 if __name__ == "__main__":
