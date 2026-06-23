@@ -26,6 +26,7 @@ from src.drivers.api.v1.router import v1_router
 from src.drivers.api.webhooks.telegram import router as telegram_webhook_router
 from src.drivers.api.webhooks.whatsapp import router as whatsapp_webhook_router
 from src.drivers.jobs.queue import create_job_pool
+from src.infrastructure.auth.crypto import verify_encryption_keys
 
 logger = structlog.get_logger()
 
@@ -43,6 +44,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     register_event_handlers()
     settings = get_settings()
     validate_production_settings(settings)
+    # Fail loudly at boot if ENCRYPTION_KEY / its fallbacks are malformed, rather than
+    # silently decrypting tenant secrets to "" (and 403-ing webhooks) on a later request.
+    verify_encryption_keys()
     logger.info("app.startup", env=settings.app_env, name=settings.app_name)
     await bootstrap_platform_admin(settings)
     # Connect the Arq job queue (ingestion runs on the worker). Skipped under the test

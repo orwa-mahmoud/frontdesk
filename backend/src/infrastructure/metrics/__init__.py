@@ -53,6 +53,15 @@ RAG_RETRIEVALS_TOTAL = Counter(
     "Total hybrid retrieval queries",
 )
 
+# ── Secrets / encryption ──────────────────────────────────────────
+# Fires when a stored tenant secret fails to decrypt — almost always ENCRYPTION_KEY
+# rotated away without keeping the old key in ENCRYPTION_KEY_FALLBACKS. Alert on any
+# increase: each failure means a secret silently read back as "" (e.g. webhook 403s).
+CRYPTO_DECRYPT_FAILURES_TOTAL = Counter(
+    "frontdesk_crypto_decrypt_failures_total",
+    "Total tenant-secret decryptions that failed (likely a key rotated away without its fallback)",
+)
+
 # ── Escalation ────────────────────────────────────────────────────
 QUESTIONS_SUBMITTED_TOTAL = Counter(
     "frontdesk_questions_submitted_total",
