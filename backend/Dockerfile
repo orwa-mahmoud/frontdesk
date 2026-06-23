@@ -5,10 +5,18 @@ RUN useradd --create-home --uid 1000 appuser
 
 WORKDIR /app
 
+# The app imports `src.*` directly and is run from /app, so it doesn't need to
+# be installed as a package — only its dependencies. PYTHONPATH makes `src`
+# importable at runtime without an editable install.
+ENV PYTHONPATH=/app
+
 RUN pip install uv
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --no-dev --frozen
+# Install dependencies only. --no-install-project skips building the `frontdesk`
+# package itself, which references ../README.md (outside this build context) and
+# whose source (src/) isn't copied until the next layer.
+RUN uv sync --no-dev --frozen --no-install-project
 
 COPY alembic.ini ./
 COPY alembic/ ./alembic/
@@ -22,5 +30,7 @@ USER appuser
 EXPOSE 8000
 
 # Entrypoint runs migrations, then execs CMD.
+# --no-sync: the venv is already built; don't re-resolve (which would try to
+# build the uninstalled project and fail on the out-of-context README).
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
