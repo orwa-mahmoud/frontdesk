@@ -40,9 +40,13 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.docker
 *.env
 !.env.example
 !.env.docker.example
+
+# Local-only Docker compose (points at host Postgres/Redis instead of bundled)
+docker-compose.local.yml
 
 # ── Testing / coverage / type cache ───────────────────────────────
 .pytest_cache/

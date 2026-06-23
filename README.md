@@ -156,10 +156,16 @@ docker compose up --build
 # Frontend: http://localhost:3000   API: http://localhost:8000
 ```
 
-The backend container applies database migrations on startup, so the schema is
-ready on first boot. The frontend is served by nginx, which reverse-proxies
-`/api` and `/webhooks` to the backend — so the app talks to the API over the
-same origin (no CORS, and the auth cookie stays first-party).
+The backend container applies database migrations on startup, so the schema —
+**including the pgvector extension**, which the first migration enables via
+`CREATE EXTENSION IF NOT EXISTS vector` — is ready on first boot with no manual
+step. The frontend is served by nginx, which reverse-proxies `/api` and
+`/webhooks` to the backend, so the app talks to the API over the same origin
+(no CORS, and the auth cookie stays first-party).
+
+Then open http://localhost:3000 and register an owner account. To use document
+ingestion and chat, add an LLM + embedding API key under **Settings** — keys are
+per-tenant (stored in the database), so the RAG features light up once one is saved.
 
 ### Local (without Docker)
 

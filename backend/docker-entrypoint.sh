@@ -5,7 +5,7 @@
 set -e
 
 echo "==> Applying database migrations (alembic upgrade head)"
-uv run alembic upgrade head
+uv run --no-sync alembic upgrade head
 
 echo "==> Starting: $*"
 exec "$@"
