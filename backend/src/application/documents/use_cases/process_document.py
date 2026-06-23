@@ -82,11 +82,13 @@ class ProcessDocumentUseCase:
             self._uow.chunks.save_many(chunks)
             doc.mark_ready(chunk_count=len(chunks))
             await self._uow.documents.save(doc)
+            self._uow.track(doc)  # dispatch DocumentIngested after commit
             await self._uow.commit()
         except Exception as exc:
             logger.warning("process.failed", document_id=str(doc.id), exc_info=True)
             doc.mark_failed(reason=str(exc))
             await self._uow.documents.save(doc)
+            self._uow.track(doc)  # dispatch DocumentIngestionFailed after commit
             await self._uow.commit()
 
     async def _contextualized_inputs(self, document: str, text_chunks: list[TextChunk]) -> list[str]:
