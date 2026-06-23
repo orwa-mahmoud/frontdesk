@@ -9,6 +9,7 @@ describe("TenantConfigResponse type", () => {
       llm_api_key_masked: "****1234",
       llm_max_tokens: 1024,
       llm_temperature: 0.3,
+      rerank_model: "gpt-4o-mini",
       embedding_provider: "openai",
       embedding_model: "text-embedding-3-large",
       embedding_api_key_masked: "",

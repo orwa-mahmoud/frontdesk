@@ -4,6 +4,7 @@ export interface TenantConfigResponse {
   llm_api_key_masked: string;
   llm_max_tokens: number;
   llm_temperature: number;
+  rerank_model: string;
   embedding_provider: string;
   embedding_model: string;
   embedding_api_key_masked: string;

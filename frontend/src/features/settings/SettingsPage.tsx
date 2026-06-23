@@ -103,7 +103,7 @@ export function SettingsPage() {
   const botMutation = useSectionMutation(updateBot, t("settings.botConfigName"), t);
 
   const llmForm = useForm({
-    initialValues: { provider: "", model: "", api_key: "", max_tokens: 1024, temperature: 0.3 },
+    initialValues: { provider: "", model: "", api_key: "", max_tokens: 1024, temperature: 0.3, rerank_model: "" },
   });
   const embForm = useForm({ initialValues: { model: "", api_key: "" } });
   const waForm = useForm({
@@ -122,6 +122,7 @@ export function SettingsPage() {
       model: settingsData.llm_model,
       max_tokens: settingsData.llm_max_tokens,
       temperature: settingsData.llm_temperature,
+      rerank_model: settingsData.rerank_model,
     });
     embForm.setValues({
       model: settingsData.embedding_model,
@@ -153,6 +154,7 @@ export function SettingsPage() {
     llm_api_key_masked: "",
     llm_max_tokens: 1024,
     llm_temperature: 0.3,
+    rerank_model: "",
     embedding_provider: "",
     embedding_model: "",
     embedding_api_key_masked: "",
@@ -194,6 +196,7 @@ export function SettingsPage() {
                   ...(v.api_key ? { api_key: v.api_key } : {}),
                   ...(v.max_tokens ? { max_tokens: v.max_tokens } : {}),
                   ...(v.temperature === undefined ? {} : { temperature: v.temperature }),
+                  ...(v.rerank_model ? { rerank_model: v.rerank_model } : {}),
                 });
               })}
             >
@@ -208,6 +211,12 @@ export function SettingsPage() {
                   label={t("settings.model")}
                   placeholder={config.llm_model}
                   {...llmForm.getInputProps("model")}
+                />
+                <TextInput
+                  label={t("settings.rerankModel")}
+                  description={t("settings.rerankModelHint")}
+                  placeholder={config.rerank_model}
+                  {...llmForm.getInputProps("rerank_model")}
                 />
                 <PasswordInput
                   label={t("settings.apiKey")}

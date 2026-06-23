@@ -37,6 +37,29 @@ def test_invalidate_forces_rebuild() -> None:
     assert c2 is not c1
 
 
+def test_reranker_client_is_separate_from_answer_client() -> None:
+    factory = TenantLLMClientFactory()
+    tid = uuid4()
+    cfg = _config(tid)
+    answer = factory.get_or_build(tid, cfg)
+    rerank = factory.get_or_build_reranker(tid, cfg)
+    # Cached under distinct keys → distinct clients, each reused on repeat calls.
+    assert rerank is not answer
+    assert factory.get_or_build_reranker(tid, cfg) is rerank
+
+
+def test_invalidate_drops_both_answer_and_reranker() -> None:
+    factory = TenantLLMClientFactory()
+    tid = uuid4()
+    cfg = _config(tid)
+    answer = factory.get_or_build(tid, cfg)
+    rerank = factory.get_or_build_reranker(tid, cfg)
+    factory.invalidate(tid)
+    # A config change must take effect for both clients on the next chat.
+    assert factory.get_or_build(tid, cfg) is not answer
+    assert factory.get_or_build_reranker(tid, cfg) is not rerank
+
+
 def test_invalidate_unknown_tenant_is_noop() -> None:
     factory = TenantLLMClientFactory()
     factory.invalidate(uuid4())  # must not raise

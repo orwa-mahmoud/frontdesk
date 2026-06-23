@@ -46,6 +46,7 @@ def _to_response(config: TenantConfig) -> TenantConfigResponse:
         llm_api_key_masked=mask(config.llm_api_key),
         llm_max_tokens=config.llm_max_tokens,
         llm_temperature=config.llm_temperature,
+        rerank_model=config.rerank_model,
         embedding_provider=config.embedding_provider,
         embedding_model=config.embedding_model,
         embedding_api_key_masked=mask(config.embedding_api_key),
@@ -80,6 +81,7 @@ async def update_llm(
         api_key=req.api_key,
         max_tokens=req.max_tokens,
         temperature=req.temperature,
+        rerank_model=req.rerank_model,
     )
     await uow.tenant_configs.save(config)
     # Drop the cached LLM client so the next chat uses the updated provider/model/key.

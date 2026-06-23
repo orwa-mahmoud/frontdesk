@@ -28,6 +28,9 @@ class TenantConfig(BaseEntity):
     llm_api_key: str
     llm_max_tokens: int
     llm_temperature: float
+    # Cheap model used only to rerank RAG candidates (reuses the LLM provider +
+    # key). Keeping it small avoids paying answer-model rates to sort snippets.
+    rerank_model: str
 
     # ── Embedding (RAG ingestion + retrieval) ──────────────────────
     embedding_provider: str
@@ -63,6 +66,7 @@ class TenantConfig(BaseEntity):
             llm_api_key="",
             llm_max_tokens=1024,
             llm_temperature=0.3,
+            rerank_model="gpt-4o-mini",
             embedding_provider="openai",
             embedding_model="text-embedding-3-large",
             embedding_api_key="",
@@ -89,6 +93,7 @@ class TenantConfig(BaseEntity):
         api_key: str | None = None,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        rerank_model: str | None = None,
     ) -> None:
         if provider is not None:
             self.llm_provider = provider
@@ -100,6 +105,8 @@ class TenantConfig(BaseEntity):
             self.llm_max_tokens = max_tokens
         if temperature is not None:
             self.llm_temperature = temperature
+        if rerank_model is not None:
+            self.rerank_model = rerank_model
         self.updated_at = datetime.now(UTC)
 
     def update_embedding(

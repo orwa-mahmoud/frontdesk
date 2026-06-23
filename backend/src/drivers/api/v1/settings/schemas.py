@@ -16,6 +16,7 @@ class TenantConfigResponse(BaseModel):
     llm_api_key_masked: str
     llm_max_tokens: int
     llm_temperature: float
+    rerank_model: str
     # Embedding
     embedding_provider: str
     embedding_model: str
@@ -40,6 +41,7 @@ class UpdateLLMConfig(BaseModel):
     api_key: str | None = Field(default=None, max_length=512)
     max_tokens: int | None = Field(default=None, ge=1, le=128000)
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    rerank_model: str | None = Field(default=None, max_length=64)
 
 
 class UpdateEmbeddingConfig(BaseModel):

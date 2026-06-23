@@ -200,6 +200,8 @@
     "botConfigName": "Bot config",
     "provider": "Provider",
     "model": "Model",
+    "rerankModel": "Rerank model",
+    "rerankModelHint": "Cheap model used only to reorder search results. Keep it small — it doesn't write answers.",
     "apiKey": "API Key",
     "enterNewKey": "Enter new key",
     "current": "Current:",

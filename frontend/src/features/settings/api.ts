@@ -7,6 +7,7 @@ export interface UpdateLLMPayload {
   api_key?: string;
   max_tokens?: number;
   temperature?: number;
+  rerank_model?: string;
 }
 
 export interface UpdateEmbeddingPayload {

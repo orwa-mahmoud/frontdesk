@@ -17,6 +17,7 @@ async def test_get_settings_returns_masked_keys(client: AsyncClient) -> None:
     body = resp.json()
     assert body["llm_provider"] == "openai"
     assert body["llm_model"] == "gpt-4o-mini"
+    assert body["rerank_model"] == "gpt-4o-mini"  # cheap default rerank model
     assert body["llm_api_key_masked"] == ""  # empty key masking
     assert body["bot_name"] == "Front Desk Assistant"
 
@@ -28,13 +29,19 @@ async def test_update_llm_config(client: AsyncClient) -> None:
     headers = {"Authorization": f"Bearer {token}"}
     resp = await client.put(
         "/api/v1/settings/llm",
-        json={"provider": "anthropic", "model": "claude-sonnet-4-5", "api_key": "sk-ant-test1234567890"},
+        json={
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5",
+            "api_key": "sk-ant-test1234567890",
+            "rerank_model": "claude-haiku-4-5",
+        },
         headers=headers,
     )
     assert resp.status_code == 200
     body = resp.json()
     assert body["llm_provider"] == "anthropic"
     assert body["llm_model"] == "claude-sonnet-4-5"
+    assert body["rerank_model"] == "claude-haiku-4-5"
     assert body["llm_api_key_masked"] == "****7890"
 
 
