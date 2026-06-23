@@ -18,7 +18,7 @@ _Live demo: coming soon_ &nbsp;·&nbsp; [Quick start](#quick-start) &nbsp;·&nbs
 
 _Screenshots coming soon._
 <!-- TODO(orwa): add dashboard.png / documents.png / chat.png to docs/screenshots/,
-     delete the line above, and uncomment the table below. See ai_docs/orwa-tasks.md.
+     delete the line above, and uncomment the table below.
 | Dashboard | Knowledge base | AI answering |
 |---|---|---|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Documents](docs/screenshots/documents.png) | ![Chat answering from a document](docs/screenshots/chat.png) |
@@ -189,6 +189,8 @@ cd frontend
 npm install
 npm run dev    # http://localhost:5173 (Vite proxies /api + /webhooks to :8000)
 ```
+
+**Stuck on first run?** See [Troubleshooting](backend/docs/SETUP.md#10-troubleshooting) for common fixes — pgvector, migrations, ports, the ingestion worker, and Docker resets.
 
 ## Frontend highlights
 

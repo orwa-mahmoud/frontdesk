@@ -170,3 +170,45 @@ https://your-domain/webhooks/{tenant_id}/whatsapp
 ```
 https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://your-domain/webhooks/{tenant_id}/telegram
 ```
+
+---
+
+## 10. Troubleshooting
+
+Common first-run failures and their fixes.
+
+**`type "vector" does not exist` (or other pgvector errors).** The extension isn't
+enabled on that database. Enable it once per database — the Docker image does this
+automatically, local installs don't:
+```bash
+psql frontdesk_db   -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+psql frontdesk_test -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+```
+
+**`alembic upgrade` fails, or the schema looks wrong.** Confirm the database exists
+and `DATABASE_URL_SYNC` points at it, then re-run `uv run alembic upgrade head`. On a
+throwaway dev DB the fastest reset is to drop and recreate:
+```bash
+dropdb frontdesk_db && createdb frontdesk_db
+psql frontdesk_db -c 'CREATE EXTENSION vector;'
+uv run alembic upgrade head
+```
+
+**`connection refused` / `could not connect to server`.** PostgreSQL isn't running,
+or `DATABASE_URL` / `DATABASE_URL_SYNC` point at the wrong host/port. Check it's up
+with `pg_isready` and that the port matches (default `5432`).
+
+**`address already in use`.** Something else holds the port — `8000` (API), `5173`
+(Vite), or `5432` (Postgres). Stop the other process, or change the port
+(`uvicorn … --port 8001`, `npm run dev -- --port 5174`).
+
+**Uploaded documents stay `uploaded` and never reach `ready`.** The ingestion worker
+isn't running — start it alongside the API (see
+[Start the ingestion worker](#start-the-ingestion-worker)).
+
+**Docker: stale data or a broken first boot.** Reset the containers *and* volumes,
+then rebuild from scratch:
+```bash
+docker compose down -v
+docker compose up --build
+```
