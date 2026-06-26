@@ -52,6 +52,24 @@ MODEL_CATALOG: tuple[ModelSpec, ...] = (
         label="GPT-5.4 nano",
         token_param=MAX_COMPLETION_TOKENS,
     ),
+    ModelSpec(
+        provider=LLMProvider.OPENAI,
+        model="gpt-5.4-mini",
+        label="GPT-5.4 mini",
+        token_param=MAX_COMPLETION_TOKENS,
+    ),
+    ModelSpec(
+        provider=LLMProvider.OPENAI,
+        model="gpt-5.4",
+        label="GPT-5.4",
+        token_param=MAX_COMPLETION_TOKENS,
+    ),
+    ModelSpec(
+        provider=LLMProvider.OPENAI,
+        model="gpt-5.5",
+        label="GPT-5.5",
+        token_param=MAX_COMPLETION_TOKENS,
+    ),
     # ── Anthropic ────────────────────────────────────────────────
     ModelSpec(provider=LLMProvider.ANTHROPIC, model="claude-haiku-4-5", label="Claude Haiku 4.5"),
     ModelSpec(provider=LLMProvider.ANTHROPIC, model="claude-sonnet-4-5", label="Claude Sonnet 4.5"),
@@ -74,3 +92,14 @@ def get_model_spec(model: str) -> ModelSpec | None:
     """The spec for a model id, or None if it is not in the catalog (caller falls
     back to legacy defaults — ``max_tokens`` + temperature)."""
     return _BY_MODEL.get(model)
+
+
+# Embedding models offered in Settings, as (model, label). Limited to models that
+# work at the chunk column's fixed 1536 dimensions: the text-embedding-3-* models
+# accept the ``dimensions`` request parameter the embedder always sends (large is
+# reduced from 3072 to 1536), whereas text-embedding-ada-002 ignores that
+# parameter, so it is intentionally excluded to avoid a dimension mismatch.
+EMBEDDING_MODELS: tuple[tuple[str, str], ...] = (
+    ("text-embedding-3-small", "text-embedding-3-small"),
+    ("text-embedding-3-large", "text-embedding-3-large"),
+)
