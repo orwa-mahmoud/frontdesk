@@ -52,6 +52,24 @@ MODEL_CATALOG: tuple[ModelSpec, ...] = (
         label="GPT-5.4 nano",
         token_param=MAX_COMPLETION_TOKENS,
     ),
+    ModelSpec(
+        provider=LLMProvider.OPENAI,
+        model="gpt-5.4-mini",
+        label="GPT-5.4 mini",
+        token_param=MAX_COMPLETION_TOKENS,
+    ),
+    ModelSpec(
+        provider=LLMProvider.OPENAI,
+        model="gpt-5.4",
+        label="GPT-5.4",
+        token_param=MAX_COMPLETION_TOKENS,
+    ),
+    ModelSpec(
+        provider=LLMProvider.OPENAI,
+        model="gpt-5.5",
+        label="GPT-5.5",
+        token_param=MAX_COMPLETION_TOKENS,
+    ),
     # ── Anthropic ────────────────────────────────────────────────
     ModelSpec(provider=LLMProvider.ANTHROPIC, model="claude-haiku-4-5", label="Claude Haiku 4.5"),
     ModelSpec(provider=LLMProvider.ANTHROPIC, model="claude-sonnet-4-5", label="Claude Sonnet 4.5"),

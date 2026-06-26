@@ -30,6 +30,13 @@ def test_unknown_model_returns_none() -> None:
     assert get_model_spec("not-a-real-model") is None
 
 
+def test_latest_openai_models_use_completion_tokens() -> None:
+    for model in ("gpt-5.4", "gpt-5.4-mini", "gpt-5.5"):
+        spec = get_model_spec(model)
+        assert spec is not None, f"{model} missing from catalog"
+        assert spec.token_param == MAX_COMPLETION_TOKENS
+
+
 def test_every_catalog_provider_has_a_label() -> None:
     for spec in MODEL_CATALOG:
         assert spec.provider in PROVIDER_LABELS
