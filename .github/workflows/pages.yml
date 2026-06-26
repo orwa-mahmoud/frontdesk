@@ -1,0 +1,44 @@
+name: Deploy demo to GitHub Pages
+
+# Publishes the static demo page (docs/demo/index.html + the walkthrough videos)
+# to GitHub Pages. Runs on pushes to main that touch docs/, plus manual dispatch.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+# Least-privilege token that can publish to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; never cancel a publish that's already in flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Turn Pages on (source = GitHub Actions) so no manual Settings toggle is needed.
+          enablement: true
+      - name: Upload docs/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

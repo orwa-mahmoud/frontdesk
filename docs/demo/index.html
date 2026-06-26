@@ -1,54 +1,181 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>frontdesk — demos</title>
-  <meta name="description" content="Video walkthroughs of frontdesk: a self-hosted, multi-tenant AI front desk with RAG-grounded answers and human-in-the-loop escalation." />
-  <style>
-    :root { --coral:#f76b22; --ink:#1f2937; --muted:#6b7280; --bg:#f8fafc; --card:#ffffff; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-           color:var(--ink); background:var(--bg); line-height:1.55; }
-    header { padding:56px 24px 8px; text-align:center; }
-    .logo { display:inline-flex; align-items:center; gap:10px; font-weight:800; font-size:24px; }
-    .logo .dot { width:24px; height:24px; border-radius:7px; background:var(--coral); }
-    header p { color:var(--muted); max-width:660px; margin:14px auto 0; }
-    main { max-width:960px; margin:0 auto; padding:24px; }
-    .demo { background:var(--card); border:1px solid #eef2f7; border-radius:16px;
-            padding:22px; margin:28px 0; box-shadow:0 8px 24px rgba(2,6,23,.05); }
-    .demo h2 { font-size:20px; margin:0 0 4px; }
-    .demo p { color:var(--muted); margin:0 0 14px; }
-    video { width:100%; border-radius:12px; background:#000; display:block; }
-    footer { text-align:center; color:var(--muted); padding:32px; }
-    a { color:var(--coral); text-decoration:none; font-weight:600; }
-    a:hover { text-decoration:underline; }
-  </style>
-</head>
-<body>
-  <header>
-    <div class="logo"><span class="dot"></span> frontdesk</div>
-    <p>A self-hosted, multi-tenant AI front desk — RAG-grounded answers over your own
-       documents, with human-in-the-loop escalation. Two short walkthroughs:</p>
-  </header>
-  <main>
-    <section class="demo">
-      <h2>Ask anything about a library</h2>
-      <p>Grounded, source-cited answers across the full <em>A Song of Ice and Fire</em> saga (~5,000 pages) — it cites the exact book.</p>
-      <video controls preload="metadata" playsinline>
-        <source src="rag-library-demo.mp4" type="video/mp4" />
-        <track kind="descriptions" src="library-demo.vtt" srclang="en" label="English description" default />
-      </video>
-    </section>
-    <section class="demo">
-      <h2>Built for real front desks</h2>
-      <p>The same engine on a business's own knowledge base — a bank's support desk answering from its policy docs, with a live human escalation.</p>
-      <video controls preload="metadata" playsinline>
-        <source src="frontdesk-demo.mp4" type="video/mp4" />
-        <track kind="descriptions" src="frontdesk-demo.vtt" srclang="en" label="English description" default />
-      </video>
-    </section>
-  </main>
-  <footer>&larr; <a href="https://github.com/orwa-mahmoud/frontdesk">Back to the repository</a></footer>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>frontdesk — demos</title>
+    <meta
+      name="description"
+      content="Video walkthroughs of frontdesk: a self-hosted, multi-tenant AI front desk with RAG-grounded answers and human-in-the-loop escalation."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=EB+Garamond:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --coral: #f76b22;
+        --gold: #e9c46a;
+        --ink: #e9ecf1;
+        --muted: #9aa3b2;
+        --bg: #0b0e13;
+        --line: rgba(233, 196, 106, 0.18);
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background-color: var(--bg);
+        font-family: "EB Garamond", Georgia, "Times New Roman", serif;
+        font-size: 18px;
+        line-height: 1.6;
+        /* torchlight over the wall */
+        background-image:
+          radial-gradient(1100px 520px at 50% -180px, rgba(247, 107, 34, 0.20), transparent 62%),
+          radial-gradient(820px 480px at 82% -60px, rgba(233, 196, 106, 0.12), transparent 60%),
+          linear-gradient(180deg, #0d1118, #0b0e13 40%);
+        background-attachment: fixed;
+        background-repeat: no-repeat;
+      }
+      .wrap { max-width: 1000px; margin: 0 auto; padding: 24px; }
+
+      header { text-align: center; padding: 70px 16px 6px; }
+      .brand { display: inline-flex; align-items: center; gap: 14px; }
+      .brand .sigil { color: var(--gold); filter: drop-shadow(0 0 10px rgba(233, 196, 106, 0.45)); }
+      .brand h1 {
+        font-family: "Cinzel", serif;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        font-size: clamp(34px, 6vw, 46px);
+        margin: 0;
+        color: #fff;
+        text-shadow: 0 0 26px rgba(247, 107, 34, 0.38);
+      }
+      .tagline {
+        font-style: italic;
+        color: var(--gold);
+        font-size: 20px;
+        margin: 16px auto 0;
+        max-width: 640px;
+      }
+      .sub { color: var(--muted); max-width: 660px; margin: 8px auto 0; }
+
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        max-width: 380px;
+        margin: 36px auto 6px;
+        color: var(--gold);
+      }
+      .divider::before,
+      .divider::after {
+        content: "";
+        height: 1px;
+        flex: 1;
+        background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        opacity: 0.55;
+      }
+      .divider .diamond { font-size: 14px; opacity: 0.85; }
+
+      .demo {
+        margin: 40px 0;
+        padding: 26px;
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+        border: 1px solid var(--line);
+        box-shadow: 0 26px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+      }
+      .demo:hover {
+        transform: translateY(-3px);
+        border-color: rgba(233, 196, 106, 0.35);
+        box-shadow: 0 34px 70px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+      .eyebrow {
+        font-family: "Cinzel", serif;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      .demo.lib .eyebrow { color: var(--gold); }
+      .demo.fd .eyebrow { color: var(--coral); }
+      .demo h2 {
+        font-family: "Cinzel", serif;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        font-size: 23px;
+        margin: 0 0 8px;
+        color: #fff;
+      }
+      .demo p { color: var(--muted); margin: 0 0 16px; }
+      .demo p em { color: var(--ink); font-style: italic; }
+      video {
+        width: 100%;
+        display: block;
+        border-radius: 12px;
+        background: #000;
+        border: 1px solid var(--line);
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 18px 44px rgba(0, 0, 0, 0.55);
+      }
+
+      footer { text-align: center; color: var(--muted); padding: 40px 16px; font-style: italic; }
+      a { color: var(--coral); text-decoration: none; font-weight: 600; }
+      a:hover { color: var(--gold); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="brand">
+          <svg class="sigil" width="30" height="30" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="5" y1="19" x2="19" y2="5" />
+            <line x1="19" y1="19" x2="5" y2="5" />
+            <line x1="3" y1="17" x2="7" y2="21" />
+            <line x1="21" y1="17" x2="17" y2="21" />
+          </svg>
+          <h1>frontdesk</h1>
+        </div>
+        <p class="tagline">Grounded answers — sworn to the source.</p>
+        <p class="sub">
+          A self-hosted, multi-tenant AI front desk: RAG-grounded answers over your own
+          documents, with human-in-the-loop escalation. Two short walkthroughs.
+        </p>
+        <div class="divider"><span class="diamond">◆</span></div>
+      </header>
+
+      <section class="demo lib" id="library">
+        <div class="eyebrow">The Westeros Archives</div>
+        <h2>Ask anything about a library</h2>
+        <p>
+          Grounded, source-cited answers across the full <em>A Song of Ice and Fire</em>
+          saga (~5,000 pages) — it cites the exact book.
+        </p>
+        <video controls preload="metadata" playsinline poster="../screenshots/library-frame.png">
+          <source src="rag-library-demo.mp4" type="video/mp4" />
+          <track kind="descriptions" src="library-demo.vtt" srclang="en" label="English description" default />
+        </video>
+      </section>
+
+      <section class="demo fd" id="frontdesk">
+        <div class="eyebrow">Beyond the books</div>
+        <h2>Built for real front desks</h2>
+        <p>
+          The same engine on a business's own knowledge base — a bank's support desk
+          answering from its policy docs, with a live human escalation.
+        </p>
+        <video controls preload="metadata" playsinline poster="../screenshots/chat.png">
+          <source src="frontdesk-demo.mp4" type="video/mp4" />
+          <track kind="descriptions" src="frontdesk-demo.vtt" srclang="en" label="English description" default />
+        </video>
+      </section>
+
+      <footer>&larr; <a href="https://github.com/orwa-mahmoud/frontdesk">Return to the repository</a></footer>
+    </div>
+  </body>
 </html>

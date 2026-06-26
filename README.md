@@ -16,7 +16,7 @@ _Live demo: coming soon_ &nbsp;·&nbsp; [Demo](#demo) &nbsp;·&nbsp; [Quick star
 
 ## Demo
 
-[![Watch the demo — ask anything about Westeros, get a grounded, cited answer](docs/screenshots/library-poster.png)](docs/demo/rag-library-demo.mp4)
+[![Watch the demo — ask anything about Westeros, get a grounded, cited answer](docs/screenshots/library-poster.png)](https://orwa-mahmoud.github.io/frontdesk/demo/#library)
 
 Point frontdesk at a library and ask anything — it answers grounded in the source
 material and **cites the exact book** every time. Here it's reading the full
@@ -31,7 +31,7 @@ answering from its policy documents, and escalating to a human when it can't:
 |---|---|---|
 | ![Owner inbox with an escalated question](docs/screenshots/dashboard.png) | ![Knowledge base of uploaded documents](docs/screenshots/documents.png) | ![AI answering a question and citing the source document](docs/screenshots/chat.png) |
 
-▶ **[Watch the front-desk walkthrough](docs/demo/frontdesk-demo.mp4)** — a support desk answering from its own documents, with a live human escalation.
+▶ **[Watch the front-desk walkthrough](https://orwa-mahmoud.github.io/frontdesk/demo/#frontdesk)** — a support desk answering from its own documents, with a live human escalation.
 
 ## Features
 
