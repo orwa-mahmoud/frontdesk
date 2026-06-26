@@ -30,7 +30,7 @@ from src.ai.types import AgentLoopResult, ToolCallResult, ToolDef
 from src.application.shared.unit_of_work import UnitOfWork
 from src.domain.conversations.value_objects import ConversationChannel
 from src.domain.llm.ports import LLMClientPort
-from src.domain.llm.value_objects import LLMMessage, LLMMessageRole
+from src.domain.llm.value_objects import LLMMessage, LLMMessageRole, LLMToolCall
 from src.domain.rag.ports import RetrieverPort
 
 logger = structlog.get_logger()
@@ -266,7 +266,9 @@ def _to_lc_messages(msgs: list[LLMMessage]) -> list[BaseMessage]:
             case LLMMessageRole.USER:
                 out.append(HumanMessage(content=m.content))
             case LLMMessageRole.ASSISTANT:
-                out.append(AIMessage(content=m.content))
+                # Preserve tool_calls so a following tool message stays linked to the
+                # assistant turn that requested it (providers reject an orphaned tool msg).
+                out.append(_to_ai_message(m.content, m.tool_calls))
             case LLMMessageRole.TOOL:
                 out.append(ToolMessage(content=m.content, tool_call_id=m.tool_call_id or ""))
     return out
@@ -280,7 +282,13 @@ def _from_lc_messages(msgs: list[BaseMessage]) -> list[LLMMessage]:
         elif isinstance(m, HumanMessage):
             out.append(LLMMessage(role=LLMMessageRole.USER, content=str(m.content)))
         elif isinstance(m, AIMessage):
-            out.append(LLMMessage(role=LLMMessageRole.ASSISTANT, content=str(m.content)))
+            # Carry tool_calls back into the domain message so the next LLM call keeps
+            # the assistant→tool linkage intact across the round-trip.
+            tool_calls = tuple(
+                LLMToolCall(id=tc.get("id") or "", name=tc.get("name") or "", arguments=tc.get("args") or {})
+                for tc in (m.tool_calls or [])
+            )
+            out.append(LLMMessage(role=LLMMessageRole.ASSISTANT, content=str(m.content), tool_calls=tool_calls))
         elif isinstance(m, ToolMessage):
             out.append(LLMMessage(role=LLMMessageRole.TOOL, content=str(m.content), tool_call_id=m.tool_call_id))
     return out

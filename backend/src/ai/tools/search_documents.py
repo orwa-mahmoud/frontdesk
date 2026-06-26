@@ -10,11 +10,15 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+import structlog
+
 from src.ai.types import ToolDef
 from src.application.documents.queries import RetrieveForQuery
 from src.application.documents.use_cases.retrieve_for_query import RetrieveForQueryUseCase
 from src.domain.rag.ports import RetrieverPort
 from src.domain.shared.utils import strip_control_chars
+
+logger = structlog.get_logger()
 
 # Owner-uploaded documents are lower-trust input: a poisoned file could carry text
 # like "ignore previous instructions". Each chunk's content is wrapped in these
@@ -69,6 +73,9 @@ async def run_search_documents(
         return []
     use_case = RetrieveForQueryUseCase(retriever=retriever)
     chunks = await use_case.execute(RetrieveForQuery(tenant_id=tenant_id, query=query_text, top_k=8))
+    # The agent chose to search the knowledge base — record the query it formed and how
+    # many chunks came back, so a transcript shows grounding-by-search vs. answer-from-memory.
+    logger.info("agent.search_documents", tenant_id=str(tenant_id), query=query_text[:120], results=len(chunks))
     return [
         {
             "content": _wrap_excerpt(c.content),

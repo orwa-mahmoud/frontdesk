@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,8 @@ from src.domain.rag.ports import EmbeddingPort, RerankerPort
 from src.domain.rag.value_objects import RetrievedChunk
 from src.infrastructure.metrics import RAG_RETRIEVALS_TOTAL
 from src.infrastructure.persistence.postgres.models.chunk import ChunkModel
+
+logger = structlog.get_logger()
 
 _DEFAULT_CANDIDATE_POOL = 50
 _RRF_K = 60
@@ -80,10 +83,28 @@ class HybridRetriever:
 
         if self._reranker is not None:
             candidates = await self._reranker.rerank(query, candidates, top_k=top_k)
+            reranked = True
         else:
             candidates = candidates[:top_k]
+            reranked = False
 
-        return reorder_lost_in_the_middle(candidates)
+        results = reorder_lost_in_the_middle(candidates)
+        # Observability: a reply with no preceding `rag.retrieve` for its query means the
+        # agent never searched — it answered from the model's own knowledge. We log the
+        # per-result document id and score (the RRF fusion score; rerank reorders but
+        # keeps it), but not the chunk text, so corpus content is not emitted on every
+        # query in a multi-tenant deployment.
+        logger.info(
+            "rag.retrieve",
+            tenant_id=str(tenant_id),
+            query=query[:120],
+            vector_hits=len(vector_hits),
+            bm25_hits=len(bm25_hits),
+            reranked=reranked,
+            returned=len(results),
+            top=[{"doc": str(c.document_id)[:8], "score": round(c.score, 4)} for c in results],
+        )
+        return results
 
     # ── Stage 1: vector (HNSW cosine) ─────────────────────────────
     async def _vector_search(

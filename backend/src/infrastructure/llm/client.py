@@ -97,6 +97,13 @@ def _to_lc_message(msg: LLMMessage, provider: str = "") -> Any:
         case LLMMessageRole.USER:
             return HumanMessage(content=content)
         case LLMMessageRole.ASSISTANT:
+            # Keep tool_calls on the assistant message — without them the provider
+            # rejects any following tool message as orphaned.
+            if msg.tool_calls:
+                return AIMessage(
+                    content=content,
+                    tool_calls=[{"id": tc.id, "name": tc.name, "args": tc.arguments} for tc in msg.tool_calls],
+                )
             return AIMessage(content=content)
         case LLMMessageRole.TOOL:
             return ToolMessage(content=content, tool_call_id=msg.tool_call_id or "")
