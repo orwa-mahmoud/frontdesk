@@ -23,7 +23,10 @@ COPY alembic/ ./alembic/
 COPY src/ ./src/
 COPY docker-entrypoint.sh ./
 
-RUN chmod +x docker-entrypoint.sh && chown -R appuser:appuser /app
+# Create the upload dir owned by appuser BEFORE the named volume mounts over it:
+# Docker seeds a fresh named volume from the mount point's ownership, so this keeps
+# uploads writable by the non-root user (otherwise the volume defaults to root).
+RUN mkdir -p /app/var/uploads && chmod +x docker-entrypoint.sh && chown -R appuser:appuser /app
 
 USER appuser
 
