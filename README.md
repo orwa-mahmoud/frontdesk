@@ -16,11 +16,11 @@ _Live demo: coming soon_ &nbsp;·&nbsp; [Demo](#demo) &nbsp;·&nbsp; [Quick star
 
 ## Demo
 
-[![Watch the demo — ask anything about Westeros, get a grounded, cited answer](docs/screenshots/library-poster.png)](https://orwa-mahmoud.github.io/sight/demo/#library)
+[![Watch the demo — ask anything about Westeros, get a grounded, cited answer](docs/screenshots/westeros-poster.png)](https://orwa-mahmoud.github.io/sight/demo/#westeros)
 
 Point Sight at a library and ask anything — it answers grounded in the source
 material and **cites the exact book** every time. Here it's reading the full
-_A Song of Ice and Fire_ saga (~5,000 pages). _Click to play (0:44)._
+_A Song of Ice and Fire_ saga (~5,000 pages). _Click to play (0:47)._
 
 ### Built for real front desks
 
@@ -31,7 +31,7 @@ answering from its policy documents, and escalating to a human when it can't:
 |---|---|---|
 | ![Owner inbox with an escalated question](docs/screenshots/dashboard.png) | ![Knowledge base of uploaded documents](docs/screenshots/documents.png) | ![AI answering a question and citing the source document](docs/screenshots/chat.png) |
 
-▶ **[Watch the front-desk walkthrough](https://orwa-mahmoud.github.io/sight/demo/#frontdesk)** — a support desk answering from its own documents, with a live human escalation.
+[![Watch the support-desk demo — a bank answering from its own policy docs, with a live human escalation](docs/screenshots/bank-poster.png)](https://orwa-mahmoud.github.io/sight/demo/#bank-demo)
 
 ## Features
 
