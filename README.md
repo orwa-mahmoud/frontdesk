@@ -11,7 +11,7 @@
 ![PostgreSQL 17 + pgvector](https://img.shields.io/badge/PostgreSQL-17%20%2B%20pgvector-336791.svg)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-🎬&nbsp;<a href="https://github.com/orwa-mahmoud/sight/blob/main/docs/demo/westeros-demo.mp4">Watch the demo</a>
+🎬&nbsp;<a href="https://orwa-mahmoud.github.io/sight/demo/">Watch the demo</a>
 
 </div>
 
@@ -25,7 +25,7 @@
 
 | Owner inbox (escalation) | Knowledge base | AI answering, with sources |
 |---|---|---|
-| ![Owner inbox with an escalated question](docs/screenshots/dashboard.png) | ![Knowledge base of uploaded documents](docs/screenshots/documents.png) | ![AI answering a question and citing the source document](docs/screenshots/chat.png) |
+| <img src="https://github.com/user-attachments/assets/1543084e-98d0-40fe-bec0-a13c447bbbc2" alt="Owner inbox with an escalated question" width="100%"> | <img src="https://github.com/user-attachments/assets/02b8399a-65de-4fe6-b83e-c2624cd024f3" alt="Knowledge base of uploaded documents" width="100%"> | <img src="https://github.com/user-attachments/assets/d07b7790-f758-49df-ac17-93af0b33494d" alt="AI answering a question and citing the source document" width="100%"> |
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/8edb4939-d7e8-417e-8bae-e98e5abf4668" controls preload="metadata" width="100%"></video>
