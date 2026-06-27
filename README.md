@@ -16,7 +16,7 @@ _Live demo: coming soon_ &nbsp;·&nbsp; [Demo](#demo) &nbsp;·&nbsp; [Quick star
 
 ## Demo
 
-[![Watch the demo — ask anything about Westeros, get a grounded, cited answer](docs/screenshots/library-poster.png)](https://orwa-mahmoud.github.io/sight/demo/#library)
+[![Watch the demo — ask anything about Westeros, get a grounded, cited answer](docs/screenshots/westeros-poster.png)](https://orwa-mahmoud.github.io/sight/demo/#westeros)
 
 Point Sight at a library and ask anything — it answers grounded in the source
 material and **cites the exact book** every time. Here it's reading the full
