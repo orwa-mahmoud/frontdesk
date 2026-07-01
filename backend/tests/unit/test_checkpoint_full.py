@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -112,9 +113,99 @@ async def test_checkpoint_triggered_above_threshold(client: None) -> None:
         assert "User asked 10 questions" in checkpoints[0].content
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_checkpoint_records_summarizer_usage(client: None) -> None:
+    """The summarizer LLM call is billable and must be recorded (source=checkpoint)."""
+    async with async_session_factory() as session:
+        uow = UnitOfWork(session)
+        from src.domain.tenants.entities import Tenant
+
+        t = Tenant.create(name="CP3", slug=f"cp3-{uuid4().hex[:8]}")
+        await uow.tenants.save(t)
+        await uow.flush()
+
+        thread_id = f"cp3-{uuid4().hex[:8]}"
+        conv = Conversation.start(tenant_id=t.id, thread_id=thread_id, channel=ConversationChannel.WEB)
+        await uow.conversations.save(conv)
+        await uow.flush()
+        for i in range(10):
+            await uow.messages.save(
+                Message.create(
+                    conversation_id=conv.id,
+                    tenant_id=t.id,
+                    role=ConversationRole.USER,
+                    content=f"message {i}" * 50,
+                    token_count=400,
+                )
+            )
+        await uow.commit()
+
+        mock_llm = AsyncMock()
+        mock_llm.chat_with_tools = AsyncMock(
+            return_value=LLMCallResult(
+                text='{"summary": "Summary.", "current_state": {}}',
+                usage=TokenUsage(input_tokens=2200, output_tokens=180),
+                provider="openai",
+                model="gpt-4o-mini",
+            )
+        )
+
+        await maybe_create_checkpoint(
+            thread_id=thread_id,
+            tenant_id=t.id,
+            channel=ConversationChannel.WEB,
+            llm=mock_llm,
+            uow=uow,
+        )
+        await uow.commit()
+
+        usages = await uow.token_usages.list_for_tenant(t.id)
+        checkpoint_usages = [u for u in usages if u.source == "checkpoint"]
+        assert len(checkpoint_usages) == 1
+        assert checkpoint_usages[0].input_tokens == 2200
+        assert checkpoint_usages[0].output_tokens == 180
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_saved_messages_accumulate_token_count(client: None) -> None:
+    """Messages saved without an explicit token_count get an estimate, so the
+    checkpoint trigger (sum_tokens_since_checkpoint) actually accumulates."""
+    from src.application.conversations.commands import SaveThreadMessage
+    from src.application.conversations.use_cases.save_thread_message import SaveThreadMessageUseCase
+    from src.domain.tenants.entities import Tenant
+
+    async with async_session_factory() as session:
+        uow = UnitOfWork(session)
+        t = Tenant.create(name="CP4", slug=f"cp4-{uuid4().hex[:8]}")
+        await uow.tenants.save(t)
+        await uow.flush()
+        await uow.commit()
+
+        thread_id = f"cp4-{uuid4().hex[:8]}"
+        save_uc = SaveThreadMessageUseCase(uow=uow)
+        result = None
+        for _ in range(5):
+            result = await save_uc.execute(
+                SaveThreadMessage(
+                    tenant_id=t.id,
+                    thread_id=thread_id,
+                    channel=ConversationChannel.WEB,
+                    role=ConversationRole.USER,
+                    content="This is a reasonably long message. " * 20,  # no token_count passed
+                )
+            )
+        await uow.commit()
+
+        assert result is not None
+        total = await uow.messages.sum_tokens_since_checkpoint(result.conversation_id)
+        assert total > 0  # was pinned at 0 before the estimate was populated
+
+
 def test_build_summarizer_input_truncates() -> None:
     """Long message lists are truncated to _MAX_RECENT_MESSAGES."""
-    messages = []
+    messages: list[Any] = []
     for i in range(40):
         m = MagicMock()
         m.is_checkpoint = False

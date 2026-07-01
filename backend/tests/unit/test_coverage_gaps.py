@@ -435,11 +435,16 @@ class TestCheckpointEdgeCases:
         mock_uow.messages = MagicMock()
         mock_uow.messages.sum_tokens_since_checkpoint = AsyncMock(return_value=5000)
         mock_uow.messages.list_since_last_checkpoint = AsyncMock(return_value=[mock_msg])
+        mock_uow.token_usages = MagicMock()
+        mock_uow.token_usages.save = AsyncMock()
+        mock_uow.track = MagicMock()
 
         mock_llm = AsyncMock()
         mock_llm.chat_with_tools.return_value = LLMCallResult(
             text="   ",  # whitespace only -> empty after strip
             usage=TokenUsage(input_tokens=10, output_tokens=5),
+            provider="openai",
+            model="gpt-4o-mini",
         )
 
         await maybe_create_checkpoint(
@@ -449,7 +454,9 @@ class TestCheckpointEdgeCases:
             llm=mock_llm,
             uow=mock_uow,
         )
-        # No checkpoint should be saved
+        # No checkpoint message is saved, but the billable summarizer call is still
+        # recorded (an empty reply still cost input+output tokens).
+        mock_uow.token_usages.save.assert_awaited_once()
 
 
 # ── Chunker edge cases ────────────────────────────────────────────
