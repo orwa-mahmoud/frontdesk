@@ -67,6 +67,29 @@ class TestGetOrRegister:
         assert phone is None
 
 
+class TestGetPhone:
+    @pytest.mark.asyncio
+    async def test_reads_phone_without_registering(self) -> None:
+        """get_phone is read-only — it never executes an INSERT, unlike get_or_register."""
+        session = AsyncMock()
+        session.execute = AsyncMock()
+        session.get = AsyncMock(return_value=MagicMock(phone="+971500000000"))
+
+        repo = PostgresTelegramPhoneRepository(session)
+        phone = await repo.get_phone("tg_7")
+
+        assert phone == "+971500000000"
+        session.execute.assert_not_called()  # no row created
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_no_row(self) -> None:
+        session = AsyncMock()
+        session.get = AsyncMock(return_value=None)
+
+        repo = PostgresTelegramPhoneRepository(session)
+        assert await repo.get_phone("tg_ghost") is None
+
+
 # ---------------------------------------------------------------------------
 # set_phone
 # ---------------------------------------------------------------------------

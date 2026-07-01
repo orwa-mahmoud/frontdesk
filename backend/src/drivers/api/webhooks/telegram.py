@@ -30,6 +30,15 @@ logger = structlog.get_logger()
 # agent only handles text, but we acknowledge rather than silently ignore.
 _TEXT_ONLY_REPLY = "Sorry, I can only read text messages right now. Please type your question."
 
+# Shown to a Telegram user we can't yet resolve to a contact (no shared phone), so
+# the "Share My Phone Number" button — and the whole contact-linking flow — is
+# actually reachable. Sent alongside the normal reply; stops once they share.
+_SHARE_PHONE_PROMPT = "Tip: share your phone number so I can remember you and pick up where we left off next time."
+# Sent once the user taps the button and shares their contact.
+_PHONE_SAVED_REPLY = "Thanks! I've saved your number — how can I help?"
+
+_DUPLICATE_LOG = "telegram.webhook.duplicate"
+
 router = APIRouter(tags=["webhooks"])
 
 
@@ -90,6 +99,29 @@ def _nontext_ids(body: dict[str, Any]) -> tuple[str, str] | None:
     return chat_id, message_id
 
 
+def _parse_telegram_contact(body: dict[str, Any]) -> tuple[str, str, str, str] | None:
+    """(telegram_user_id, phone, chat_id, message_id) when the user shared THEIR OWN
+    phone via the request_contact button, else None.
+
+    A ``contact`` message can also carry someone else's contact card, so we only
+    accept it when ``contact.user_id`` equals the sender's id — never binding a
+    third party's number to this user."""
+    message = body.get("message") or body.get("edited_message")
+    if not message:
+        return None
+    contact = message.get("contact")
+    if not contact:
+        return None
+    telegram_user_id = str(message.get("from", {}).get("id", ""))
+    phone = str(contact.get("phone_number", ""))
+    if not telegram_user_id or not phone or str(contact.get("user_id", "")) != telegram_user_id:
+        return None
+    chat_id = str(message.get("chat", {}).get("id", ""))
+    raw_msg_id = message.get("message_id")
+    message_id = f"{chat_id}:{raw_msg_id}" if raw_msg_id is not None else ""
+    return telegram_user_id, phone, chat_id, message_id
+
+
 async def _validate_telegram_request(
     uow: UnitOfWork, tid: UUID, secret_header: str | None, tenant_id_raw: str
 ) -> TenantConfig | int:
@@ -122,8 +154,12 @@ async def _process_telegram_text(
     # processed. The marker is set only on success below, so a failed turn stays
     # re-deliverable rather than dropped.
     if await was_message_processed(tenant_id=tid, channel="telegram", message_id=message_id):
-        logger.info("telegram.webhook.duplicate", tenant_id=tenant_id_raw, message_id=message_id)
+        logger.info(_DUPLICATE_LOG, tenant_id=tenant_id_raw, message_id=message_id)
         return
+    # Whether we can already resolve this user to a contact — read-only, so it
+    # never creates the NULL-phone row that chat_with_agent registers below.
+    has_phone = await uow.telegram_phones.get_phone(telegram_user_id) is not None
+
     result = await chat_with_agent(
         ChatInput(
             message=text,
@@ -139,6 +175,27 @@ async def _process_telegram_text(
     if not result.duplicate and config.telegram_bot_token and chat_id:
         adapter = await get_telegram_adapter(str(tid), tenant_config=config)
         await adapter.send_text(chat_id, result.response)
+        # No phone on file → surface the "Share My Phone Number" button so the user
+        # can become a real contact (key facts, continuity). Stops once they share.
+        if not has_phone:
+            await adapter.send_contact_request(chat_id, _SHARE_PHONE_PROMPT)
+    await mark_message_processed(tenant_id=tid, channel="telegram", message_id=message_id)
+
+
+async def _handle_telegram_contact(
+    tid: UUID, uow: UnitOfWork, config: TenantConfig, contact: tuple[str, str, str, str], tenant_id_raw: str
+) -> None:
+    """Persist a shared phone (telegram_user_id -> phone), then acknowledge and
+    drop the keyboard. The user's next message resolves to a real contact."""
+    telegram_user_id, phone, chat_id, message_id = contact
+    if await was_message_processed(tenant_id=tid, channel="telegram", message_id=message_id):
+        logger.info(_DUPLICATE_LOG, tenant_id=tenant_id_raw, message_id=message_id)
+        return
+    await uow.telegram_phones.set_phone(telegram_user_id, phone)
+    await uow.commit()
+    if config.telegram_bot_token and chat_id:
+        adapter = await get_telegram_adapter(str(tid), tenant_config=config)
+        await adapter.send_text(chat_id, _PHONE_SAVED_REPLY, remove_keyboard=True)
     await mark_message_processed(tenant_id=tid, channel="telegram", message_id=message_id)
 
 
@@ -148,7 +205,7 @@ async def _handle_telegram_nontext(
     """Reply to a non-text (media) message once, de-duplicated like the text path."""
     nontext_chat_id, nontext_message_id = nontext_ids
     if await was_message_processed(tenant_id=tid, channel="telegram", message_id=nontext_message_id):
-        logger.info("telegram.webhook.duplicate", tenant_id=tenant_id_raw, message_id=nontext_message_id)
+        logger.info(_DUPLICATE_LOG, tenant_id=tenant_id_raw, message_id=nontext_message_id)
         return
     if config.telegram_bot_token and nontext_chat_id:
         adapter = await get_telegram_adapter(str(tid), tenant_config=config)
@@ -158,8 +215,9 @@ async def _handle_telegram_nontext(
 
 async def _handle_telegram_post(tid: UUID, body: dict[str, Any], secret_header: str | None, tenant_id_raw: str) -> int:
     parsed = _parse_telegram_message(body)
-    nontext_ids = _nontext_ids(body) if parsed is None else None
-    if parsed is None and nontext_ids is None:
+    contact = _parse_telegram_contact(body) if parsed is None else None
+    nontext_ids = _nontext_ids(body) if parsed is None and contact is None else None
+    if parsed is None and contact is None and nontext_ids is None:
         return 200
 
     async for session in get_session():
@@ -170,6 +228,9 @@ async def _handle_telegram_post(tid: UUID, body: dict[str, Any], secret_header: 
                 return validated
             config = validated
 
+            if contact is not None:
+                await _handle_telegram_contact(tid, uow, config, contact, tenant_id_raw)
+                return 200
             if parsed is None:
                 assert nontext_ids is not None  # parsed is None ⇒ nontext_ids was resolved above
                 await _handle_telegram_nontext(tid, config, nontext_ids, tenant_id_raw)
