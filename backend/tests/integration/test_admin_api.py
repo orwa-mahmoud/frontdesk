@@ -70,6 +70,47 @@ async def test_admin_lists_all_tenants_and_users(client: AsyncClient) -> None:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+async def test_admin_tenant_row_counts_members_and_documents(client: AsyncClient) -> None:
+    from src.domain.documents.entities import Document
+    from src.domain.documents.value_objects import DocumentMimeType
+    from src.domain.users.entities import User, UserTenant
+    from src.domain.users.value_objects import UserTenantRole
+
+    admin_token, _, tenant_id = await _register(client, "count-admin@test.com")
+    await _promote("count-admin@test.com")
+
+    # Add a second member + two documents to the admin's own tenant.
+    from uuid import UUID
+
+    async with async_session_factory() as session:
+        uow = UnitOfWork(session)
+        member = User.create(email=f"member-{uuid.uuid4().hex[:6]}@test.com", hashed_password="h")
+        await uow.users.save(member)
+        await uow.flush()
+        await uow.user_tenants.save(
+            UserTenant.create(user_id=member.id, tenant_id=UUID(tenant_id), role=UserTenantRole.STAFF)
+        )
+        for i in range(2):
+            await uow.documents.save(
+                Document.upload(
+                    tenant_id=UUID(tenant_id),
+                    uploaded_by_user_id=None,
+                    filename=f"doc-{i}.md",
+                    mime_type=DocumentMimeType.MARKDOWN,
+                    size_bytes=10,
+                )
+            )
+        await uow.commit()
+
+    tenants = await client.get("/api/v1/admin/tenants", headers=_auth(admin_token))
+    row = next(r for r in tenants.json() if r["id"] == tenant_id)
+    assert row["owner_email"] == "count-admin@test.com"
+    assert row["user_count"] == 2  # owner + the added member
+    assert row["document_count"] == 2
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_admin_deactivates_tenant_blocks_member_login(client: AsyncClient) -> None:
     admin_token, _, _ = await _register(client, "admin@test.com")
     _, _, victim_tenant = await _register(client, "victim@test.com")

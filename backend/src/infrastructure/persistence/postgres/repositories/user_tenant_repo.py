@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.users.entities import UserTenant
+from src.domain.users.repositories import TenantMemberSummary
 from src.domain.users.value_objects import UserTenantRole
+from src.infrastructure.persistence.postgres.models.user import UserModel
 from src.infrastructure.persistence.postgres.models.user_tenant import UserTenantModel
 
 
@@ -47,6 +49,23 @@ class PostgresUserTenantRepository:
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
+
+    async def summarize_members_by_tenant(self) -> dict[UUID, TenantMemberSummary]:
+        owner = UserTenantRole.OWNER.value
+        stmt = (
+            select(
+                UserTenantModel.tenant_id,
+                func.count().label("user_count"),
+                func.max(case((UserTenantModel.role == owner, UserModel.email))).label("owner_email"),
+            )
+            .join(UserModel, UserModel.id == UserTenantModel.user_id)
+            .group_by(UserTenantModel.tenant_id)
+        )
+        result = await self._session.execute(stmt)
+        return {
+            row.tenant_id: TenantMemberSummary(owner_email=row.owner_email, user_count=int(row.user_count))
+            for row in result
+        }
 
     # ── Mapping helpers ────────────────────────────────────────────
     @staticmethod
