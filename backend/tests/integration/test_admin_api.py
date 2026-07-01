@@ -84,7 +84,8 @@ async def test_admin_tenant_row_counts_members_and_documents(client: AsyncClient
 
     async with async_session_factory() as session:
         uow = UnitOfWork(session)
-        member = User.create(email=f"member-{uuid.uuid4().hex[:6]}@test.com", hashed_password="h")
+        member_email = f"member-{uuid.uuid4().hex[:6]}@test.com"
+        member = User.create(email=member_email, hashed_password="h")
         await uow.users.save(member)
         await uow.flush()
         await uow.user_tenants.save(
@@ -107,6 +108,12 @@ async def test_admin_tenant_row_counts_members_and_documents(client: AsyncClient
     assert row["owner_email"] == "count-admin@test.com"
     assert row["user_count"] == 2  # owner + the added member
     assert row["document_count"] == 2
+
+    # The users list resolves each user's primary membership (tenant + role).
+    users = await client.get("/api/v1/admin/users", headers=_auth(admin_token))
+    member_row = next(u for u in users.json() if u["email"] == member_email)
+    assert member_row["tenant_id"] == tenant_id
+    assert member_row["role"] == "staff"
 
 
 @pytest.mark.integration

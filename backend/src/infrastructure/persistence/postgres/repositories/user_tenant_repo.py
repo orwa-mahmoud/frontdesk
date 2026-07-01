@@ -8,8 +8,9 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.users.entities import UserTenant
-from src.domain.users.repositories import TenantMemberSummary
+from src.domain.users.repositories import PrimaryMembership, TenantMemberSummary
 from src.domain.users.value_objects import UserTenantRole
+from src.infrastructure.persistence.postgres.models.tenant import TenantModel
 from src.infrastructure.persistence.postgres.models.user import UserModel
 from src.infrastructure.persistence.postgres.models.user_tenant import UserTenantModel
 
@@ -64,6 +65,28 @@ class PostgresUserTenantRepository:
         result = await self._session.execute(stmt)
         return {
             row.tenant_id: TenantMemberSummary(owner_email=row.owner_email, user_count=int(row.user_count))
+            for row in result
+        }
+
+    async def primary_membership_by_user(self) -> dict[UUID, PrimaryMembership]:
+        # DISTINCT ON (user_id) with the joined_at tiebreaker keeps the user's first
+        # membership — the same one list_for_user + links[0] resolved per user.
+        stmt = (
+            select(
+                UserTenantModel.user_id,
+                UserTenantModel.tenant_id,
+                TenantModel.name.label("tenant_name"),
+                UserTenantModel.role,
+            )
+            .join(TenantModel, TenantModel.id == UserTenantModel.tenant_id)
+            .order_by(UserTenantModel.user_id, UserTenantModel.joined_at)
+            .distinct(UserTenantModel.user_id)
+        )
+        result = await self._session.execute(stmt)
+        return {
+            row.user_id: PrimaryMembership(
+                tenant_id=row.tenant_id, tenant_name=row.tenant_name, role=UserTenantRole(row.role)
+            )
             for row in result
         }
 

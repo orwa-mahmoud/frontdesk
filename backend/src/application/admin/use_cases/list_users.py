@@ -14,18 +14,12 @@ class ListUsersForAdmin:
 
     async def execute(self) -> list[AdminUserDTO]:
         users = await self._uow.users.list_all()
+        # Each user's primary tenant + role in one query, instead of a per-user
+        # membership lookup plus a per-user tenant lookup.
+        memberships = await self._uow.user_tenants.primary_membership_by_user()
         rows: list[AdminUserDTO] = []
         for user in users:
-            links = await self._uow.user_tenants.list_for_user(user.id)
-            tenant_id = None
-            tenant_name = None
-            role = None
-            if links:
-                link = links[0]
-                tenant_id = link.tenant_id
-                role = link.role.value
-                tenant = await self._uow.tenants.get_by_id(link.tenant_id)
-                tenant_name = tenant.name if tenant else None
+            membership = memberships.get(user.id)
             rows.append(
                 AdminUserDTO(
                     id=user.id,
@@ -33,9 +27,9 @@ class ListUsersForAdmin:
                     full_name=user.full_name,
                     is_active=user.is_active,
                     is_platform_admin=user.is_platform_admin,
-                    tenant_id=tenant_id,
-                    tenant_name=tenant_name,
-                    role=role,
+                    tenant_id=membership.tenant_id if membership else None,
+                    tenant_name=membership.tenant_name if membership else None,
+                    role=membership.role.value if membership else None,
                 )
             )
         return rows
