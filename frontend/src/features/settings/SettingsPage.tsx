@@ -27,6 +27,7 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@auth/useAuth";
+import { apiErrorMessage } from "@shared/utils/apiError";
 
 import {
   getModelCatalog,
@@ -86,8 +87,11 @@ function useSectionMutation<T>(fn: (p: T) => Promise<unknown>, section: string, 
       notifications.show({ color: "teal", message: t("settings.updated", { section }) });
       qc.invalidateQueries({ queryKey: ["settings"] });
     },
-    onError: () => {
-      notifications.show({ color: "red", message: t("settings.updateError", { section }) });
+    onError: (error: unknown) => {
+      notifications.show({
+        color: "red",
+        message: apiErrorMessage(error, t("settings.updateError", { section })),
+      });
     },
   });
 }
@@ -293,6 +297,7 @@ export function SettingsPage() {
               <Stack>
                 <Select
                   label={t("settings.model")}
+                  description={t("settings.embeddingModelHint")}
                   data={embeddingModelOptions}
                   placeholder={config.embedding_model}
                   searchable

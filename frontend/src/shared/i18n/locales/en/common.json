@@ -211,6 +211,7 @@
     "saveLlm": "Save LLM config",
     "embApiKey": "API Key (leave blank to use LLM key)",
     "usingLlmKey": "Using LLM key",
+    "embeddingModelHint": "Changing the model requires an empty knowledge base — delete all documents first, then switch and re-upload.",
     "saveEmbedding": "Save embedding config",
     "phoneNumberId": "Phone Number ID",
     "accessToken": "Access Token",

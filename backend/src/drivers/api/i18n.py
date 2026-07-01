@@ -30,6 +30,14 @@ _CATALOG: dict[str, dict[str, str]] = {
     "document.unsupported_type": {"ar": "نوع ملف غير مدعوم. المسموح: PDF وDOCX وMarkdown ونص عادي."},
     "question.not_found": {"ar": "السؤال غير موجود"},
     "question.forbidden": {"ar": "السؤال لا يخص هذا المستأجر"},
+    "tenant_config.embedding_change_blocked": {
+        "ar": (
+            "تغيير نموذج أو مزوّد التضمين سيُعطّل البحث في مستنداتك الحالية المُفهرسة بالنموذج الحالي. "
+            "احذف جميع المستندات أولًا ثم غيّر النموذج وأعد رفعها."
+        )
+    },
+    "tenant_config.unsupported_embedding_model": {"ar": "نموذج تضمين غير مدعوم."},
+    "tenant_config.unsupported_embedding_provider": {"ar": "مزوّد تضمين غير مدعوم. المدعوم فقط هو openai."},
 }
 
 
