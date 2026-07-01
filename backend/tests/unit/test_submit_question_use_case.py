@@ -30,6 +30,7 @@ def _uow() -> MagicMock:
     uow.conversations.get_by_id = AsyncMock(return_value=None)
     uow.questions.save = AsyncMock()
     uow.track = MagicMock()
+    uow.commit = AsyncMock()
     return uow
 
 
@@ -80,3 +81,4 @@ async def test_submit_accepts_own_contact_and_conversation() -> None:
 
     assert dto.tenant_id == tenant
     uow.questions.save.assert_awaited_once()
+    uow.commit.assert_awaited_once()  # commit → QuestionSubmitted dispatched

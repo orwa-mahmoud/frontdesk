@@ -40,4 +40,8 @@ class SubmitQuestionUseCase:
         )
         await self._uow.questions.save(question)
         self._uow.track(question)
+        # Commit here (not via the request's session auto-commit) so the tracked
+        # QuestionSubmitted event is actually dispatched — the session commit alone
+        # never runs _dispatch_events.
+        await self._uow.commit()
         return to_dto(question)

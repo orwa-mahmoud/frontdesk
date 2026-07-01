@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -14,7 +14,7 @@ from src.domain.questions.entities import Question
 from src.domain.shared.exceptions import AuthorizationError, EntityNotFoundError
 
 
-def _make_question(*, tenant_id=None) -> Question:
+def _make_question(*, tenant_id: UUID | None = None) -> Question:
     return Question.submit(
         tenant_id=tenant_id or uuid4(),
         channel=ConversationChannel.WHATSAPP,
@@ -60,9 +60,12 @@ async def test_reply_question_happy_path() -> None:
     uow.questions = MagicMock()
     uow.questions.get_by_id = AsyncMock(return_value=question)
     uow.questions.save = AsyncMock()
+    uow.track = MagicMock()
+    uow.commit = AsyncMock()
 
     uc = ReplyToQuestionUseCase(uow=uow)
     cmd = ReplyToQuestion(tenant_id=tid, question_id=question.id, replied_by_user_id=user_id, reply="100 AED per night")
     dto = await uc.execute(cmd)
     assert dto.status == "resolved"
     assert dto.owner_reply == "100 AED per night"
+    uow.commit.assert_awaited_once()  # commit → QuestionResolved dispatched

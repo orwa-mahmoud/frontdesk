@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -14,7 +14,7 @@ from src.domain.questions.entities import Question
 from src.domain.shared.exceptions import AuthorizationError, EntityNotFoundError
 
 
-def _make_question(*, tenant_id=None) -> Question:
+def _make_question(*, tenant_id: UUID | None = None) -> Question:
     return Question.submit(
         tenant_id=tenant_id or uuid4(),
         channel=ConversationChannel.API,
@@ -59,8 +59,11 @@ async def test_close_question_happy_path() -> None:
     uow.questions = MagicMock()
     uow.questions.get_by_id = AsyncMock(return_value=question)
     uow.questions.save = AsyncMock()
+    uow.track = MagicMock()
+    uow.commit = AsyncMock()
 
     uc = CloseQuestionUseCase(uow=uow)
     cmd = CloseQuestion(tenant_id=tid, question_id=question.id)
     dto = await uc.execute(cmd)
     assert dto.status == "closed"
+    uow.commit.assert_awaited_once()  # commit → QuestionClosed dispatched
