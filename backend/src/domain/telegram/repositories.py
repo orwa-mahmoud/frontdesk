@@ -8,6 +8,11 @@ from typing import Protocol
 class TelegramPhoneRepository(Protocol):
     """Port for telegram_user_id -> phone lookup table."""
 
+    async def get_phone(self, telegram_user_id: str) -> str | None:
+        """Read the stored phone without registering a row. Returns the phone, or
+        None if there is no mapping or it has no phone yet."""
+        ...
+
     async def get_or_register(self, telegram_user_id: str) -> str | None:
         """Get phone for a telegram_user_id.
 

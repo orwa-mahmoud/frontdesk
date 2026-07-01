@@ -53,8 +53,12 @@ class RecursiveTokenChunker:
             return self._token_chunks(text)
         parts = text.split(sep)
         out: list[str] = []
-        for p in parts:
-            piece = p if sep == "" else p + sep
+        last_index = len(parts) - 1
+        for i, p in enumerate(parts):
+            # Re-attach the separator that split() stripped between parts — but NOT
+            # to the final part, which never had a trailing separator. Appending it
+            # there doubled punctuation / added a stray newline to the tail.
+            piece = p + sep if i < last_index else p
             if self._token_len(piece) <= self._chunk_size:
                 out.append(piece)
             else:

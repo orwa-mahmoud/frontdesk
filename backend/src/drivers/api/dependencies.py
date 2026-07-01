@@ -74,6 +74,13 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise AuthenticationError("User no longer exists or is disabled")
 
+    # Session invalidation on password change: reject any token minted before the
+    # password was last set. Changing the password bumps `password_changed_at`, so
+    # every previously-issued session (on any device) stops working immediately.
+    iat = payload.get("iat")
+    if iat is not None and int(iat) < int(user.password_changed_at.timestamp()):
+        raise AuthenticationError("Session expired, please sign in again", code="auth.session_revoked")
+
     # Scope the DB transaction to this user's tenant for Row-Level Security.
     # Harmless under a superuser role (RLS bypassed); enforced under a non-superuser
     # role. Platform admins are scoped too, but their cross-tenant admin use cases

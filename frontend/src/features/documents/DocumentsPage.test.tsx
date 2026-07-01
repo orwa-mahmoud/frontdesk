@@ -210,6 +210,23 @@ describe("DocumentsPage", () => {
     });
   });
 
+  it("resets the file input after a pick so the same file can be re-selected", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
+    vi.mocked(api.post).mockResolvedValue({ data: DOC_LIST[0] });
+    const { container } = render(<DocumentsPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => expect(screen.getByText("Upload file")).toBeInTheDocument());
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["hello"], "test.pdf", { type: "application/pdf" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => expect(api.post).toHaveBeenCalled());
+    // The resetRef cleared the input value, so selecting the identical file again
+    // still fires a change event (the browser suppresses it when value is unchanged).
+    expect(fileInput.value).toBe("");
+  });
+
   it("calls upload API even when the file type is wrong", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });
     vi.mocked(api.post).mockRejectedValue(new Error("upload failed"));

@@ -6,6 +6,7 @@ from src.application.conversations.commands import SaveThreadMessage
 from src.application.conversations.dtos import SaveMessageResult
 from src.application.shared.unit_of_work import UnitOfWork
 from src.domain.conversations.entities import Conversation, Message
+from src.domain.conversations.token_estimate import estimate_tokens
 
 
 class SaveThreadMessageUseCase:
@@ -26,6 +27,11 @@ class SaveThreadMessageUseCase:
             await self._uow.conversations.save(conversation)
             await self._uow.flush()
 
+        # Estimate the token size of any message the caller didn't count itself, so
+        # the checkpoint-compaction trigger (sum of tokens since last checkpoint)
+        # actually accumulates instead of staying pinned at 0.
+        token_count = cmd.token_count or estimate_tokens(cmd.content)
+
         message = Message.create(
             conversation_id=conversation.id,
             tenant_id=cmd.tenant_id,
@@ -36,7 +42,7 @@ class SaveThreadMessageUseCase:
             tool_args=cmd.tool_args,
             tool_result=cmd.tool_result,
             is_checkpoint=cmd.is_checkpoint,
-            token_count=cmd.token_count,
+            token_count=token_count,
             request_id=cmd.request_id,
             provider_message_id=cmd.provider_message_id,
         )

@@ -7,7 +7,12 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from src.ai.gateway import invalidate_tenant_llm_client
-from src.domain.shared.exceptions import AuthenticationError, AuthorizationError, EntityNotFoundError
+from src.domain.shared.exceptions import (
+    AuthenticationError,
+    AuthorizationError,
+    EntityNotFoundError,
+    InvalidOperationError,
+)
 from src.domain.tenant_config.entities import TenantConfig
 from src.domain.tenant_config.model_catalog import EMBEDDING_MODELS, MODEL_CATALOG, PROVIDER_LABELS
 from src.domain.users.value_objects import UserTenantRole
@@ -116,7 +121,21 @@ async def update_embedding(
     current_user: CurrentUser,
     uow: UnitOfWorkDep,
 ) -> TenantConfigResponse:
-    _, config = await _resolve_config(current_user, uow, require_owner=True)
+    tenant_id, config = await _resolve_config(current_user, uow, require_owner=True)
+    # Vectors are only comparable within one embedding space. Once documents have
+    # been ingested, switching model/provider would leave existing chunks embedded
+    # under the old model — retrieval silently returns garbage. Block the change and
+    # tell the owner to clear their knowledge base first, then re-upload.
+    changing_space = (req.provider is not None and req.provider != config.embedding_provider) or (
+        req.model is not None and req.model != config.embedding_model
+    )
+    if changing_space and await uow.chunks.count_for_tenant(tenant_id) > 0:
+        raise InvalidOperationError(
+            "Changing the embedding model or provider would break search over your "
+            "existing documents, which are embedded with the current model. Delete all "
+            "documents first, then change the embedding model and re-upload them.",
+            code="tenant_config.embedding_change_blocked",
+        )
     config.update_embedding(
         provider=req.provider,
         model=req.model,

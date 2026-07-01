@@ -20,11 +20,13 @@ import structlog
 
 from src.application.conversations.commands import SaveThreadMessage
 from src.application.conversations.use_cases.save_thread_message import SaveThreadMessageUseCase
+from src.application.llm_usage.commands import RecordTokenUsage
+from src.application.llm_usage.use_cases.record_token_usage import RecordTokenUsageUseCase
 from src.application.shared.unit_of_work import UnitOfWork
 from src.domain.conversations.entities import Message
 from src.domain.conversations.value_objects import ConversationChannel, ConversationRole
 from src.domain.llm.ports import LLMClientPort
-from src.domain.llm.value_objects import LLMMessage, LLMMessageRole
+from src.domain.llm.value_objects import LLMCallResult, LLMMessage, LLMMessageRole
 
 logger = structlog.get_logger()
 
@@ -102,6 +104,10 @@ async def maybe_create_checkpoint(
         logger.warning("checkpoint.summarize_failed", thread_id=thread_id, exc_info=True)
         return
 
+    # The summarizer runs on the tenant's answer model — a real, billable call.
+    # Record it even if the reply is empty (it still cost tokens).
+    await _record_summarizer_usage(response, tenant_id=tenant_id, request_id=request_id, channel=channel, uow=uow)
+
     summary_text = response.text.strip()
     if not summary_text:
         return
@@ -123,6 +129,32 @@ async def maybe_create_checkpoint(
         )
     )
     logger.info("checkpoint.created", thread_id=thread_id, tokens_before=total_tokens)
+
+
+async def _record_summarizer_usage(
+    response: LLMCallResult,
+    *,
+    tenant_id: UUID,
+    request_id: str | None,
+    channel: ConversationChannel,
+    uow: UnitOfWork,
+) -> None:
+    usage = response.usage
+    if usage.input_tokens <= 0 and usage.output_tokens <= 0:
+        return
+    await RecordTokenUsageUseCase(uow=uow).execute(
+        RecordTokenUsage(
+            tenant_id=tenant_id,
+            provider=response.provider,
+            model=response.model,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cache_read_tokens=usage.cache_read_tokens,
+            request_id=request_id,
+            source="checkpoint",
+            channel=channel.value,
+        )
+    )
 
 
 def _build_summarizer_input(messages: list[Message]) -> str:

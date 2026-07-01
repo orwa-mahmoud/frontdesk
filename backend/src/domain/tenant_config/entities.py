@@ -15,7 +15,15 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from src.domain.shared.entities import BaseEntity
+from src.domain.shared.exceptions import InvalidOperationError
+from src.domain.tenant_config.model_catalog import EMBEDDING_MODELS
 from src.domain.tenant_config.value_objects import LLMProvider
+
+# The chunk embedding column is a fixed 1536-dim vector, so only the OpenAI
+# text-embedding-3-* models (which honour the ``dimensions`` request param) are
+# valid. Anything else would silently write mismatched vectors — reject it here.
+_VALID_EMBEDDING_MODELS: frozenset[str] = frozenset(model_id for model_id, _ in EMBEDDING_MODELS)
+_VALID_EMBEDDING_PROVIDER = "openai"
 
 
 @dataclass(eq=False, kw_only=True)
@@ -116,6 +124,16 @@ class TenantConfig(BaseEntity):
         model: str | None = None,
         api_key: str | None = None,
     ) -> None:
+        if model is not None and model not in _VALID_EMBEDDING_MODELS:
+            raise InvalidOperationError(
+                f"Unsupported embedding model '{model}'. Choose one of: {', '.join(sorted(_VALID_EMBEDDING_MODELS))}.",
+                code="tenant_config.unsupported_embedding_model",
+            )
+        if provider is not None and provider != _VALID_EMBEDDING_PROVIDER:
+            raise InvalidOperationError(
+                f"Unsupported embedding provider '{provider}'. Only '{_VALID_EMBEDDING_PROVIDER}' is supported.",
+                code="tenant_config.unsupported_embedding_provider",
+            )
         if provider is not None:
             self.embedding_provider = provider
         if model is not None:

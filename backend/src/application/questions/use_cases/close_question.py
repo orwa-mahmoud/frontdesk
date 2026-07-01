@@ -23,4 +23,7 @@ class CloseQuestionUseCase:
         question.close()
         await self._uow.questions.save(question)
         self._uow.track(question)
+        # Commit here so the tracked QuestionClosed event is dispatched (the
+        # request's session auto-commit never runs _dispatch_events).
+        await self._uow.commit()
         return to_dto(question)

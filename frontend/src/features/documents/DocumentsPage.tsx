@@ -10,7 +10,7 @@ import {
 } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDateTime } from "@shared/utils/datetime";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -137,6 +137,10 @@ export function DocumentsPage() {
     refetchInterval: (query) => (query.state.data?.some(isActivelyProcessing) ? 4000 : false),
   });
 
+  // Clears the hidden <input type="file"> after each pick so selecting the SAME
+  // file again still fires onChange (e.g. re-uploading a doc that failed ingestion).
+  const resetFileRef = useRef<() => void>(null);
+
   const uploadMutation = useMutationWithNotification({
     mutationFn: uploadDocument,
     successMessage: t("documents.uploaded"),
@@ -252,7 +256,11 @@ export function DocumentsPage() {
               {t("documents.testInChat")}
             </Button>
             <FileButton
-              onChange={(file) => file && uploadMutation.mutate(file)}
+              resetRef={resetFileRef}
+              onChange={(file) => {
+                if (file) uploadMutation.mutate(file);
+                resetFileRef.current?.();
+              }}
               accept=".pdf,.md,.markdown,.txt,.docx"
             >
               {(props) => (

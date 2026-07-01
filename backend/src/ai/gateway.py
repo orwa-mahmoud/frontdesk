@@ -42,6 +42,7 @@ from src.application.shared.unit_of_work import UnitOfWork
 from src.config.settings import get_settings
 from src.domain.conversations.value_objects import ConversationRole
 from src.domain.llm.ports import LLMClientPort
+from src.domain.llm.usage_sink import LLMUsageSink
 from src.domain.llm.value_objects import LLMMessage, LLMMessageRole
 from src.domain.shared.exceptions import InvalidOperationError
 from src.domain.tenant_config.entities import TenantConfig
@@ -55,6 +56,12 @@ from src.infrastructure.rag.retriever import HybridRetriever
 logger = structlog.get_logger()
 
 _TOOLS = [SEARCH_DOCUMENTS_DEF, ESCALATE_QUESTION_DEF, SAVE_KEY_FACT_DEF, REMOVE_KEY_FACT_DEF]
+
+# How long a turn waits for a concurrent turn on the same thread before giving up
+# and running anyway: 50 x 0.2s = 10s. Comfortably covers a normal turn (a few
+# seconds) while staying under provider webhook timeouts.
+_THREAD_LOCK_WAIT_ATTEMPTS = 50
+_THREAD_LOCK_WAIT_INTERVAL_SECONDS = 0.2
 
 
 async def chat_with_agent(inp: ChatInput, *, uow: UnitOfWork) -> ChatResult:
@@ -117,37 +124,40 @@ async def chat_with_agent(inp: ChatInput, *, uow: UnitOfWork) -> ChatResult:
     await uow.commit()
     await uow.set_tenant_scope(inp.tenant_id)
 
-    # ── 2. Load history ───────────────────────────────────────────
-    history = await load_history(thread_id=thread_id, uow=uow)
-
-    # ── 3. Build prompt (with key facts if available) ───────────
-    system_msg = build_asker_system_prompt(
-        bot_name=tenant_config.bot_name,
-        bot_language=tenant_config.bot_language,
-        welcome_message=tenant_config.bot_welcome_message,
-    )
-    facts_context = ""
-    if contact_id is not None:
-        facts_context = await load_key_facts_context(
-            tenant_id=inp.tenant_id,
-            contact_id=contact_id,
-            uow=uow,
-        )
-    messages: list[LLMMessage] = [system_msg]
-    if facts_context:
-        messages.append(LLMMessage(role=LLMMessageRole.SYSTEM, content=facts_context))
-    messages.extend(history)
-    if not any(m.role == LLMMessageRole.USER for m in messages):
-        messages.append(LLMMessage(role=LLMMessageRole.USER, content=inp.message))
-
-    # ── 4. Build LLM client + retriever from tenant config ────────
-
-    llm, retriever = _build_llm_and_retriever(inp.tenant_id, tenant_config, uow)
-
-    # ── 5. Acquire thread lock + run LangGraph agent ───────────────
+    # ── 2. Serialize the turn on this thread ──────────────────────
+    # Acquire the per-thread lock BEFORE loading history, so a concurrent turn on
+    # the same thread waits here and then loads a history that already includes this
+    # turn — the two never interleave their writes or double-run the agent. Held
+    # through the reply save and released in `finally` (a no-op if never held).
     lock = await _acquire_thread_lock(thread_id)
-
     try:
+        # ── 3. Load history ───────────────────────────────────────
+        history = await load_history(thread_id=thread_id, uow=uow)
+
+        # ── 4. Build prompt (with key facts if available) ─────────
+        system_msg = build_asker_system_prompt(
+            bot_name=tenant_config.bot_name,
+            bot_language=tenant_config.bot_language,
+            welcome_message=tenant_config.bot_welcome_message,
+        )
+        facts_context = ""
+        if contact_id is not None:
+            facts_context = await load_key_facts_context(
+                tenant_id=inp.tenant_id,
+                contact_id=contact_id,
+                uow=uow,
+            )
+        messages: list[LLMMessage] = [system_msg]
+        if facts_context:
+            messages.append(LLMMessage(role=LLMMessageRole.SYSTEM, content=facts_context))
+        messages.extend(history)
+        if not any(m.role == LLMMessageRole.USER for m in messages):
+            messages.append(LLMMessage(role=LLMMessageRole.USER, content=inp.message))
+
+        # ── 5. Build LLM client + retriever from tenant config ────
+        llm, retriever, rerank_usage = _build_llm_and_retriever(inp.tenant_id, tenant_config, uow)
+
+        # ── 6. Run LangGraph agent ────────────────────────────────
         logger.info(
             "gateway.agent_start",
             thread_id=thread_id,
@@ -162,6 +172,7 @@ async def chat_with_agent(inp: ChatInput, *, uow: UnitOfWork) -> ChatResult:
             uow=uow,
             max_tokens=tenant_config.llm_max_tokens,
             temperature=tenant_config.llm_temperature,
+            redis_client=_get_redis_client(),
         )
         result = await run_graph(
             graph,
@@ -180,37 +191,43 @@ async def chat_with_agent(inp: ChatInput, *, uow: UnitOfWork) -> ChatResult:
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
         )
+
+        # ── 7. Save tool exchanges + assistant reply ──────────────
+        await _save_agent_messages(save_uc, inp, thread_id, result, request_id)
+
+        # ── 8. Record token usage (agent loop + reranker side calls) ──
+        await _record_usage(
+            inp,
+            tenant_config,
+            result,
+            rerank_usage=rerank_usage,
+            thread_id=thread_id,
+            request_id=request_id,
+            uow=uow,
+        )
+
+        # ── 9. Maybe create checkpoint (structured summary) ───────
+        await maybe_create_checkpoint(
+            thread_id=thread_id,
+            tenant_id=inp.tenant_id,
+            channel=inp.channel,
+            llm=llm,
+            uow=uow,
+            request_id=request_id,
+        )
+
+        return ChatResult(
+            response=result.text,
+            thread_id=thread_id,
+            escalated=_was_escalated(result),
+            request_id=request_id,
+            sources=_extract_sources(result),
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+        )
     finally:
         if lock:
             await lock.release()
-
-    # ── 6. Save tool exchanges + assistant reply ──────────────────
-    await _save_agent_messages(save_uc, inp, thread_id, result, request_id)
-
-    # ── 7. Record token usage ─────────────────────────────────────
-    await _record_usage(inp, tenant_config, result, thread_id=thread_id, request_id=request_id, uow=uow)
-
-    # ── 8. Maybe create checkpoint (structured summary) ─────────
-    await maybe_create_checkpoint(
-        thread_id=thread_id,
-        tenant_id=inp.tenant_id,
-        channel=inp.channel,
-        llm=llm,
-        uow=uow,
-        request_id=request_id,
-    )
-
-    escalated = any(tc.tool_name == "escalate_question" for tc in result.tool_calls)
-
-    return ChatResult(
-        response=result.text,
-        thread_id=thread_id,
-        escalated=escalated,
-        request_id=request_id,
-        sources=_extract_sources(result),
-        input_tokens=result.input_tokens,
-        output_tokens=result.output_tokens,
-    )
 
 
 def _iter_search_rows(result: AgentLoopResult) -> Iterator[dict[str, Any]]:
@@ -288,6 +305,17 @@ async def _save_agent_messages(
     )
 
 
+def _was_escalated(result: AgentLoopResult) -> bool:
+    """True only when an escalate_question tool call actually created a Question. A
+    failed call (e.g. the model omitted question_text) is caught in the graph and
+    left an ``{"error": ...}`` result with no Question — it must not be reported as
+    escalated to the caller/UI."""
+    return any(
+        tc.tool_name == "escalate_question" and not (isinstance(tc.result, dict) and "error" in tc.result)
+        for tc in result.tool_calls
+    )
+
+
 def _record_agent_metrics(channel: str, result: AgentLoopResult) -> None:
     AGENT_INVOCATIONS_TOTAL.labels(channel=channel).inc()
     for tc in result.tool_calls:
@@ -299,27 +327,49 @@ async def _record_usage(
     tenant_config: TenantConfig,
     result: AgentLoopResult,
     *,
+    rerank_usage: LLMUsageSink,
     thread_id: str,
     request_id: str,
     uow: UnitOfWork,
 ) -> None:
-    """Persist token usage for the turn (skipped when nothing was consumed)."""
-    if result.input_tokens <= 0 and result.output_tokens <= 0:
-        return
-    await RecordTokenUsageUseCase(uow=uow).execute(
-        RecordTokenUsage(
-            tenant_id=inp.tenant_id,
-            provider=tenant_config.llm_provider.value,
-            model=tenant_config.llm_model,
-            input_tokens=result.input_tokens,
-            output_tokens=result.output_tokens,
-            cache_read_tokens=result.cache_read_tokens,
-            thread_id=thread_id,
-            request_id=request_id,
-            source="asker",
-            channel=inp.channel.value,
+    """Persist token usage for the turn: the agent-loop reply plus any billable
+    reranker side calls (skipping segments that consumed nothing)."""
+    commands: list[RecordTokenUsage] = []
+    if result.input_tokens > 0 or result.output_tokens > 0:
+        commands.append(
+            RecordTokenUsage(
+                tenant_id=inp.tenant_id,
+                provider=tenant_config.llm_provider.value,
+                model=tenant_config.llm_model,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+                cache_read_tokens=result.cache_read_tokens,
+                thread_id=thread_id,
+                request_id=request_id,
+                source="asker",
+                channel=inp.channel.value,
+            )
         )
-    )
+    for call in rerank_usage.drain():
+        commands.append(
+            RecordTokenUsage(
+                tenant_id=inp.tenant_id,
+                provider=call.provider or tenant_config.llm_provider.value,
+                model=call.model or tenant_config.rerank_model,
+                input_tokens=call.usage.input_tokens,
+                output_tokens=call.usage.output_tokens,
+                cache_read_tokens=call.usage.cache_read_tokens,
+                thread_id=thread_id,
+                request_id=request_id,
+                source="reranker",
+                channel=inp.channel.value,
+            )
+        )
+    if not commands:
+        return
+    record_uc = RecordTokenUsageUseCase(uow=uow)
+    for cmd in commands:
+        await record_uc.execute(cmd)
 
 
 class _Singletons:
@@ -335,20 +385,26 @@ def _get_llm_factory() -> TenantLLMClientFactory:
 
 def _build_llm_and_retriever(
     tenant_id: uuid.UUID, config: TenantConfig, uow: UnitOfWork
-) -> tuple[LLMClientPort, HybridRetriever]:
-    """Answer-model client + the hybrid retriever. Reranking runs on a cheap,
-    dedicated model so each turn pays answer-model rates for one call (the reply),
-    not two."""
+) -> tuple[LLMClientPort, HybridRetriever, LLMUsageSink]:
+    """Answer-model client + the hybrid retriever + a usage sink for the reranker's
+    side calls. Reranking runs on a cheap, dedicated model so each turn pays
+    answer-model rates for one call (the reply), not two — but that cheap call is
+    still billable, so its usage is collected in the sink and recorded after the turn."""
     factory = _get_llm_factory()
     llm = factory.get_or_build(tenant_id, config)
     rerank_llm = factory.get_or_build_reranker(tenant_id, config)
+    rerank_usage = LLMUsageSink()
     embedder = OpenAIEmbedder(
         api_key=config.embedding_api_key or config.llm_api_key,
         model=config.embedding_model,
         dimensions=1536,
     )
-    retriever = HybridRetriever(session=uow._session, embedder=embedder, reranker=LLMReranker(rerank_llm))
-    return llm, retriever
+    retriever = HybridRetriever(
+        session=uow._session,
+        embedder=embedder,
+        reranker=LLMReranker(rerank_llm, usage_sink=rerank_usage),
+    )
+    return llm, retriever, rerank_usage
 
 
 def invalidate_tenant_llm_client(tenant_id: uuid.UUID) -> None:
@@ -372,16 +428,22 @@ def _get_redis_client() -> object | None:
 
 
 async def _acquire_thread_lock(thread_id: str) -> ThreadLock | None:
-    """Acquire a Redis-based thread lock. Returns the lock or None if unavailable."""
+    """Acquire the per-thread lock, waiting out any in-flight turn on the same
+    thread so the two never run concurrently. Returns the lock (held, or
+    un-acquired after a wait timeout — release is then a no-op and the caller
+    degrades to running anyway), or None when Redis is unavailable."""
     client = _get_redis_client()
     if client is None:
         return None
 
     try:
         lock = ThreadLock(client, thread_id)
-        acquired = await lock.acquire()
-        if not acquired:
-            logger.warning("gateway.thread_lock.contention", thread_id=thread_id)
+        held = await lock.acquire_blocking(
+            attempts=_THREAD_LOCK_WAIT_ATTEMPTS,
+            interval_seconds=_THREAD_LOCK_WAIT_INTERVAL_SECONDS,
+        )
+        if not held:
+            logger.warning("gateway.thread_lock.wait_timeout", thread_id=thread_id)
         return lock
     except Exception:
         logger.warning("gateway.thread_lock.unavailable", thread_id=thread_id)

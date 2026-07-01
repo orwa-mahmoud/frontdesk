@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.infrastructure.rag.chunker import RecursiveTokenChunker
+from src.infrastructure.rag.chunker import _SEPARATORS, RecursiveTokenChunker
 
 
 def test_empty_text_produces_no_chunks() -> None:
@@ -28,3 +28,15 @@ def test_chunks_overlap_carries_tail_to_next() -> None:
     text = "A. B. C. D. " + ("filler " * 200) + " end-marker"
     chunks = RecursiveTokenChunker(chunk_size=150, overlap_ratio=0.2).chunk(text)
     assert len(chunks) >= 2
+
+
+def test_recursive_split_is_lossless_no_duplicated_trailing_separator() -> None:
+    """Splitting then rejoining the pieces must reproduce the source exactly — the
+    final part must not get a re-appended separator (which doubled punctuation)."""
+    chunker = RecursiveTokenChunker(chunk_size=5)  # tiny → forces a real ". " split
+    text = "Sentence one. Sentence two. Sentence three."
+
+    pieces = chunker._recursive_split(text, _SEPARATORS)
+
+    assert "".join(pieces) == text  # lossless reconstruction
+    assert not any(".. " in p for p in pieces)  # no doubled period on the tail

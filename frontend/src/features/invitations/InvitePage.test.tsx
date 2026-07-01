@@ -21,10 +21,11 @@ vi.mock("@core/api/client", () => ({
 
 const mockRefresh = vi.fn().mockResolvedValue(undefined);
 const mockNavigate = vi.fn();
+const mockLogout = vi.fn();
 let mockUser: { email: string } | null = null;
 
 vi.mock("@auth/useAuth", () => ({
-  useAuth: () => ({ user: mockUser, refresh: mockRefresh }),
+  useAuth: () => ({ user: mockUser, refresh: mockRefresh, logout: mockLogout }),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -91,6 +92,18 @@ describe("InvitePage", () => {
     vi.mocked(api.get).mockResolvedValue({ data: VALID_PREVIEW });
     renderAt();
     expect(await screen.findByText(/signed in as/i)).toBeInTheDocument();
+  });
+
+  it("switch account signs the wrong user out and returns to the invite via login", async () => {
+    mockUser = { email: "someone-else@test.com" };
+    vi.mocked(api.get).mockResolvedValue({ data: VALID_PREVIEW });
+    renderAt();
+
+    fireEvent.click(await screen.findByRole("button", { name: /invited account/i }));
+
+    expect(mockLogout).toHaveBeenCalledOnce();
+    // Goes to login carrying the invite as the post-login return target.
+    expect(mockNavigate).toHaveBeenCalledWith("/login", { state: { from: "/invite/tok-123" } });
   });
 
   it("registers a brand-new user through the invite", async () => {

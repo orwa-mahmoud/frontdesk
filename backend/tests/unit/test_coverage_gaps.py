@@ -164,8 +164,9 @@ class TestWhatsAppWebhookPostFlow:
         mock_send.assert_called_once()
 
     @patch("src.drivers.api.webhooks.whatsapp.chat_with_agent", new_callable=AsyncMock)
-    async def test_webhook_post_agent_exception_still_returns_200(self, mock_chat: AsyncMock) -> None:
-        """When chat_with_agent raises, the handler catches it and returns 200."""
+    async def test_webhook_post_agent_exception_returns_503(self, mock_chat: AsyncMock) -> None:
+        """When chat_with_agent raises, the handler asks Meta to redeliver (503)
+        instead of acking a lost reply."""
         from src.application.shared.unit_of_work import UnitOfWork
         from src.domain.tenant_config.entities import TenantConfig
         from src.domain.tenants.entities import Tenant
@@ -223,7 +224,7 @@ class TestWhatsAppWebhookPostFlow:
                 headers={"Content-Type": "application/json", "X-Hub-Signature-256": sig},
             )
 
-        assert resp.status_code == 200
+        assert resp.status_code == 503
 
 
 class TestWhatsAppVerifySuccess:
@@ -435,11 +436,16 @@ class TestCheckpointEdgeCases:
         mock_uow.messages = MagicMock()
         mock_uow.messages.sum_tokens_since_checkpoint = AsyncMock(return_value=5000)
         mock_uow.messages.list_since_last_checkpoint = AsyncMock(return_value=[mock_msg])
+        mock_uow.token_usages = MagicMock()
+        mock_uow.token_usages.save = AsyncMock()
+        mock_uow.track = MagicMock()
 
         mock_llm = AsyncMock()
         mock_llm.chat_with_tools.return_value = LLMCallResult(
             text="   ",  # whitespace only -> empty after strip
             usage=TokenUsage(input_tokens=10, output_tokens=5),
+            provider="openai",
+            model="gpt-4o-mini",
         )
 
         await maybe_create_checkpoint(
@@ -449,7 +455,9 @@ class TestCheckpointEdgeCases:
             llm=mock_llm,
             uow=mock_uow,
         )
-        # No checkpoint should be saved
+        # No checkpoint message is saved, but the billable summarizer call is still
+        # recorded (an empty reply still cost input+output tokens).
+        mock_uow.token_usages.save.assert_awaited_once()
 
 
 # ── Chunker edge cases ────────────────────────────────────────────

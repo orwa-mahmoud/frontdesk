@@ -29,4 +29,7 @@ class ReplyToQuestionUseCase:
         question.resolve(reply=cmd.reply, replied_by_user_id=cmd.replied_by_user_id)
         await self._uow.questions.save(question)
         self._uow.track(question)
+        # Commit here so the tracked QuestionResolved event is dispatched (the
+        # request's session auto-commit never runs _dispatch_events).
+        await self._uow.commit()
         return to_dto(question)
