@@ -15,7 +15,7 @@ export function InvitePage() {
   const { t } = useTranslation();
   const { token = "" } = useParams();
   const navigate = useNavigate();
-  const { user, refresh } = useAuth();
+  const { user, refresh, logout } = useAuth();
   const [busy, setBusy] = useState(false);
 
   const previewQuery = useQuery({
@@ -134,7 +134,10 @@ export function InvitePage() {
     );
   }
 
-  // Logged in as a different account.
+  // Logged in as a different account. "Switch account" must actually sign the
+  // current user out first — otherwise /login just bounces an authenticated user
+  // back to the dashboard — then return here (via the login `from` redirect) so
+  // they can accept the invite as the invited account.
   if (user && user.email !== preview.email) {
     return shell(
       <>
@@ -142,9 +145,15 @@ export function InvitePage() {
         <Alert variant="light" color="yellow" icon={<IconAlertCircle size={18} />}>
           {t("invite.wrongAccount", { current: user.email, invited: preview.email })}
         </Alert>
-        <Anchor component={Link} to="/login">
+        <Button
+          variant="light"
+          onClick={() => {
+            logout();
+            navigate("/login", { state: { from: `/invite/${token}` } });
+          }}
+        >
           {t("invite.switchAccount")}
-        </Anchor>
+        </Button>
       </>,
     );
   }
