@@ -31,6 +31,7 @@ class PostgresUserRepository:
         model.full_name = user.full_name
         model.is_active = user.is_active
         model.is_platform_admin = user.is_platform_admin
+        model.password_changed_at = user.password_changed_at
         model.updated_at = user.updated_at
 
     async def get_by_id(self, user_id: UUID) -> User | None:
@@ -58,6 +59,7 @@ class PostgresUserRepository:
             full_name=user.full_name,
             is_active=user.is_active,
             is_platform_admin=user.is_platform_admin,
+            password_changed_at=user.password_changed_at,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )
@@ -71,6 +73,7 @@ class PostgresUserRepository:
             full_name=model.full_name,
             is_active=model.is_active,
             is_platform_admin=model.is_platform_admin,
+            password_changed_at=model.password_changed_at,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )

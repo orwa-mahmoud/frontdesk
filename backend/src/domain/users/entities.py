@@ -29,6 +29,10 @@ class User(BaseEntity):
     full_name: str | None
     is_active: bool
     is_platform_admin: bool
+    # When the password was last set. Access tokens issued before this instant are
+    # rejected (see get_current_user), so a password change logs out every other
+    # session immediately.
+    password_changed_at: datetime
     created_at: datetime
     updated_at: datetime
 
@@ -42,6 +46,7 @@ class User(BaseEntity):
             full_name=full_name.strip() if full_name else None,
             is_active=True,
             is_platform_admin=False,
+            password_changed_at=now,
             created_at=now,
             updated_at=now,
         )
@@ -80,8 +85,10 @@ class User(BaseEntity):
         self._emit(PlatformAdminRevoked(user_id=self.id, email=self.email))
 
     def update_password(self, new_hashed_password: str) -> None:
+        now = datetime.now(UTC)
         self.hashed_password = new_hashed_password
-        self.updated_at = datetime.now(UTC)
+        self.password_changed_at = now
+        self.updated_at = now
 
 
 @dataclass(eq=False, kw_only=True)

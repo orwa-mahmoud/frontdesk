@@ -83,7 +83,18 @@ class ChangePasswordRequest(BaseModel):
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
-async def change_password(req: ChangePasswordRequest, current_user: CurrentUser, uow: UnitOfWorkDep) -> None:
+async def change_password(
+    req: ChangePasswordRequest,
+    current_user: CurrentUser,
+    uow: UnitOfWorkDep,
+    response: Response,
+) -> None:
     await ChangePasswordUseCase(uow=uow, password_hasher=get_password_hasher()).execute(
         ChangePassword(user_id=current_user.id, old_password=req.old_password, new_password=req.new_password)
     )
+    # Changing the password bumps `password_changed_at`, which invalidates every
+    # token issued before now — including the one that authorized this request.
+    # Re-issue a fresh cookie so the caller stays signed in while all *other*
+    # sessions are logged out.
+    refreshed = await RefreshTokenUseCase(uow=uow, jwt_service=get_jwt_service()).execute(current_user.id)
+    _set_auth_cookie(response, refreshed.access_token)
